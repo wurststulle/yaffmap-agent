@@ -1,158 +1,259 @@
 #!/bin/sh
 . /etc/functions.sh
-##########
-#  JSON helper
-append(){
-	eval "$1=\"\$$1$2\""
+include /lib/network/
+
+#######
+# JSON helper
+# These functions are filling up the variable DATA if not called with the arguments -v <Variable name>.
+app(){
+  eval "$1=\"\$$1$2\""
 }
 
-obj(){
-	[ -n "$1" ] && DATA="$DATA\"$1\":"
-	append DATA "\"$1\""
-#	DATA="$DATA{"
-#	echo "new object"
+rem_trailing_comma(){
+	DATA=$( echo $DATA | sed s/.$// )
 }
 
-endobj(){
-#	DATA="$DATA}$1"
-#	echo "closed object"
+json_helper(){
+	do="$1"
+	shift
+	
+  if [ "$1" = "-v" ]
+  then
+  	var=$2
+  	shift;shift
+  else
+    var="DATA"
+  fi
+
+		case $do in
+      "obj")		[ -n "$1" ] && app $var "\\\"$1\\\":"
+								app $var "{"
+      					;;
+			"endobj")	rem_trailing_comma
+								app $var "},"
+								;;
+			"array")	
+								[ -n "$1" ] && app $var "\\\"$1\\\":"
+								app $var "["
+								;;
+			"endarr")	rem_trailing_comma
+								app $var "],"
+      					;;
+      "attr")		
+      					app $var "\\\"$1\\\":\\\"$2\\\","
+      					;;
+    esac
 }
 
-array(){
-	[ -n "$1" ] && DATA="$DATA\"$1\":"
-#	DATA="$DATA["
-#	echo "new array $1"
-}
+for s in obj endobj array endarr attr
+do
+	eval "alias $s=\"json_helper $s\""
+done
 
-endarr(){
-#	DATA="$DATA]$1"
-#	echo "closed array"
-}
-
-attr(){
-#	DATA="$DATA\"$1\":\"$2\"$3"
-#	echo "Attribute added: \"$1\":\"$2\"$3 "
-}
 #
-###########
+#######
 
-int_addresses(){
-  local ifname=$1
-  ipv4ad=$( ip addr show dev $ifname | grep "inet " | cut -d" " -f6 | cut -d"/" -f1 )
-  [ -n "$ipv4ad" ] && attr ipv4Addr "$ipv4ad" ,
-  ipv6ad=$( ip addr show dev $ifname | grep inet6 | cut -d" " -f6 | cut -d"/" -f1 )
-  [ -n "$ipv6ad" ] && attr ipv6Addr "$ipv6ad" ,
-  attr macAddr $( ip addr show dev $ifname | grep ether | cut -d" " -f6 )
-  DATA="${DATA}$2"
+ip_params(){
+	network=$1
+	config_get_batch "$network" ipaddr ip6addr
+		
+	[ -n "$ipaddr" ] && attr ipv4Addr $ipaddr
+	[ -n "$ip6addr" ] && attr ipv6Addr $ip6Addr
 }
 
-wifi_iface_attributes(){
-  
-  
+config_get_batch(){
+	for s in $*
+	do
+		eval "config_get $s \"$1\" $s"
+	done
 }
+
+wifi_default_config(){
+
+cat <<EOF >> /etc/config/freifunk_map
+
+config rf-iface $config
+	option	'antDirection'	'0'
+	option	'antGain'	'2'
+	option	'antBeamH'	'360'
+	option	'antBeamV'	'90'
+	option	'antPol'	'V'
+	option	'antTilt'	'0'
+	option	'ignore'	'0'
+
+EOF
+
+}
+
+wired_default_config(){
+
+cat <<EOF >> /etc/config/freifunk_map
+
+config wired-iface $config
+	option	'bandwidth'	'100M'
+	option	'duplex'	'full'
+	option	'ignore'	'0'
+
+EOF
+
+}
+
 
 wifi_device_attributes(){
-  config="$1"
-  local channel wirelessStandard availFrequency
-  config_get channel "$config" channel
-  config_get hwmode "$config" hwmode
-  
-  config_foreach wifi_iface_attributes wifi-iface
-  
+#	echo "entered wifi_device_attributes()"
+	
+	wifi_iface_attributes(){
+#		echo "entered wifi_iface_attributes()"
+		local config="$1"
+	
+		config_get device "$config" device
+		if [ "$device" = "$2" ]
+		then
+			config_get_batch "$config" ssid bssid mode
+			
+			obj
+				[ -n "$ssid" ] && attr essid $ssid
+				[ -n "$bssid" ] && attr bssid $bssid
+				[ -n "$mode" ] && attr wlMode $mode
+					config_get network "$config" network
+				eval "ifname=\$CONFIG_${network}_ifname"
+				attr name $ifname
+				ip_params $network
+			endobj
+			net_aliases $network 			
+		fi
+	} 
+
+	local config="$1"
+	
+	[ "$VIRGIN_MODE" = "1" ] && wifi_default_config	$config
+	
+	config_load freifunk_map
+	config_get ignore "$config" ignore
+	config_load wireless
+	
+	if [ "$ignore" != "1" ]
+	then
+		config_get_batch "$config" channel hwmode txpower hwmode macaddr antDirection antGain antBeamH antBeamV antPol antTilt
+		obj
+			attr name $config
+			
+			for s in antDirection antGain antBeamH antBeamV antPol antTilt channel txpower
+			do
+				eval "var_cont=\$$s"
+				[ -n "$var_cont" ] && attr $s $var_cont
+			done
+			
+			obj deviceType
+				attr isWireless "1"
+				[ -n "$hwmode" ] && attr wirelessStandard "802.$hwmode"
+			endobj
+			
+			if [ -z "$macaddr" ]
+			then
+				macaddr=$( ip addr show dev $config | grep -e '.*:.*:.*:.*:.*:.*' | cut -d" " -f 6 )
+			fi
+			attr macAddr $macaddr
+			
+			array iface
+				config_foreach wifi_iface_attributes wifi-iface $config
+			endarr
+		endobj
+	fi
+} 
+
+net_aliases(){
+	config_get aliases "$1" aliases
+	for a in $aliases
+	do
+		obj
+			config_get ifname "$a" ifname
+			attr name $ifname
+			ip_params $a
+		endobj
+	done
 }
 
-wifi_interfaces(){
-  config_load wireless
-  config_foreach wifi_device_attributes wifi-device
+network_interfaces(){
+#  echo "entered network_interfaces()"
+	network_iface(){
+		local config=$1
+		local iswireless=0
+		local isbridge=0
+		
+		[ "$VIRGIN_MODE" = "1" ] && wired_default_config	$config
 
-  local ifname
-#gather information for broadcom wifi device
-  if [ -e /proc/net/wl0 ]
-  then
-    obj
-      if [ "$(nvram get wl0_mode)" = "ap" ]; then
-          wlmode=ap
-      elif [ "$(nvram get wl0_infra)" = "1" ]; then
-          wlmode=sta
-      else
-          wlmode=adhoc
-      fi
-      attr wlMode $wlmode ,
-      attr channel $( nvram get wl0_channel ) ,
-      attr bssid $( wl status | grep BSSID | cut -d" " -f2 | cut -f1 ) ,
-      attr essid $( wl status | grep 'SSID: "' | cut -d" " -f2 | sed 's/"/ /g' ) ,
-      ifname=$( nvram get wl0_ifname )
-      attr name $ifname ,
-      int_addresses $ifname ,
-      obj ifaceType
-        attr isWireless 1 ,
-        attr wirelessStandard 802.1$( nvram get wl0_phytype ) ,
-        attr availFrequency 2.4G
-      endobj
-    endobj 
-  fi
-  DATA="${DATA}$1"
-}
+		config_load freifunk_map
+		config_get ignore "$config" ignore
+		config_load network
 
-ethernet_interfaces(){
-  for s in wan lan
-  do
-    ifname=$( nvram get ${s}_ifname )
-    if [ -n "$(ip addr show dev $ifname | grep UP)" ]
-    then
-      obj
-        attr bandwidth 100M ,
-        attr duplex full ,
-        attr name $ifname ,
-        int_addresses $ifname ,
-        obj ifaceType
-          attr isWireless 0
-        endobj
-      endobj $( [ "$s" = "lan" ] || echo "," ) #do not append comma if at the and of interface list
-    fi
-  done
-  DATA="${DATA}$1" #but append one if requested
+		if [ "$ignore" != "1" ]
+		then
+			config_get type "$config" type
+			[ "$type" = "bridge" ] && isbridge=1
+		
+			obj
+				obj deviceType
+					attr isWireless 0
+					attr bandwidth 100M
+					attr duplex full
+				endobj
+				config_get ifname "$config" ifname
+				macaddr=$( ip addr show dev $ifname | grep -e '.*:.*:.*:.*:.*:.*' | cut -d" " -f 6 )
+				attr macAddr $macaddr
+				array iface
+					obj
+						attr name $ifname
+						ip_params $config
+					endobj
+					net_aliases $config
+				endarr
+			endobj
+		fi
+	}
+
+	array device
+		config_load network
+		scan_interfaces
+		config_foreach network_iface interface
+
+		config_load wireless
+		config_foreach wifi_device_attributes wifi-device
+	endarr
 }
 
 olsr_links(){
-  olsr_config=$1
-  obj olsr
-    attr metric $( grep LinkQualityAlgorithm $olsr_config | cut -f2 | sed 's/"//g' ) ,
-    ipversion=$( grep IpVersion $olsr_config | cut -f3 )
-    attr ipv $ipversion ,
-
-    case "$ipversion" in
-      "4" ) exec<<EOM
-	    $( wget -O- http://127.0.0.1:2006/links | grep -e ^[1-9] )
+#	echo "entered olsr_links()"
+	olsr_config=$1
+	obj olsr
+		attr metric $( grep LinkQualityAlgorithm $olsr_config | cut -d" " -f2 | sed 's/"//g' ) 
+		ipversion=$( grep IpVersion $olsr_config | cut -d" " -f2 )
+		attr ipv $ipversion 
+    
+		case "$ipversion" in
+			"4" ) exec<<EOM
+	    $( wget -T30 -q -O- http://127.0.0.1:2006/links | grep -e ^[1-9] )
 EOM
-            ;;
-      "6" ) exec<<EOM
-	    $( wget -O- http://[::1]:2006/links | grep -e ^[1-9] )
+					;;
+			"6" ) exec<<EOM
+	    $( wget -T30 -q -O- http://[::1]:2006/links | grep -e ^[1-9] )
 EOM
-            ;;
-    esac
+					;;
+		esac
 
-    firstrun=1
-    array link        
-    while read my_ip n_ip hyst lq nlq etx 
-    do
-       if [ "$firstrun" = "1" ]
-       then
-          firstrun=0	
-       else
-          DATA="$DATA,"
-       fi
-       if [ -n "$n_ip" -a "$etx" != "INFINITE" ]; then
-	 obj
-	   attr sourceAddr $my_ip ,
-	   attr destAddr $n_ip ,
-	   attr metric $lq
-	 endobj
-       fi
-    done 
-    endarr 
-  endobj
-  DATA="$DATA$2"
+		array link        
+		while read my_ip n_ip hyst lq nlq etx 
+		do
+			if [ -n "$n_ip" -a "$etx" != "INFINITE" ]; then
+				obj
+					attr sourceAddr $my_ip
+					attr destAddr $n_ip
+					attr metric $lq
+				endobj
+			fi
+		done 
+		endarr 
+	endobj
 }
 
 rp_links(){
@@ -165,21 +266,20 @@ rp_links(){
 
 
 full_node_update(){
+#	echo "entered full_node_update()"
 #  if [ ! -e /tmp/ff_map_cache ]
 #  then
     DATA="node="
     obj
-      attr id $( nvram get ffmap_id ) ,
-      attr updateInterval $( nvram get ffmap_interval ) ,
-      attr timeout $( nvram get ffmap_timeout ) ,
-      attr longitude $( nvram get ff_adm_latlon | cut -d"," -f1 | cut -d";" -f1 ) ,
-      attr latitude $( nvram get ff_adm_latlon | cut -d"," -f2 | cut -d";" -f2 | sed 's/ //g' ) ,
+    	config_get_batch ffmap id interval timeout
+      attr id $nodeid ,
+      attr updateInterval $interval ,
+      attr timeout $timeout ,
+#      attr longitude $( nvram get ff_adm_latlon | cut -d"," -f1 | cut -d";" -f1 ) ,
+#      attr latitude $( nvram get ff_adm_latlon | cut -d"," -f2 | cut -d";" -f2 | sed 's/ //g' ) ,
       attr hostname $( uname -n )
 
-      array interface
-        wifi_interfaces ,
-        ethernet_interfaces
-      endarr ,
+			network_interfaces
 #      echo $DATA > /tmp/ff_map_cache
 #  else
 #    DATA=$( cat /tmp/ff_map_cache )
@@ -189,21 +289,44 @@ full_node_update(){
       rp_links
     endobj
   endobj
+  rem_trailing_comma
 }
 
 URL="http://wurststulle.dyndns.org/ffmap/build/index.php"
 
-if [ -z "$( nvram get ffmap_id )" ]
+if [ ! -e /etc/config/freifunk_map ]
 then
-  macAddr=$( ip addr show dev $( nvram get wl0_ifname ) | grep ether | cut -d" " -f6 )
-  returnstring=$( wget -q -O- "$URL?do=getID&macAddr=$macAddr" )
-  errorcode=$( echo $returnstring | cut -d"|" -f1 )
-  errormessage=$( echo $returnstring | cut -d"|" -f2 )
-  returndata=$( echo $returnstring | cut -d"|" -f3 )
-  eval "$returndata"
-  nvram set ffmap_id=$id
-  nvram set ffmap_interval=1
-  nvram set ffmap_timeout=5
+	echo "kein config-file"
+	cat <<EOF > /etc/config/freifunk_map
+
+config 'ffmap' 'ffmap'
+	option	'id' '0'
+	option	'interval' '1'
+	option	'timeout' '5'
+
+EOF
+	VIRGIN_MODE=1
+fi
+
+config_load freifunk_map
+config_get nodeid ffmap id
+
+if [ "$nodeid" = "0" -o -z "$nodeid" ]
+then
+	echo moep
+	macAddr=$( ip addr show dev eth0 | grep -e '.*:.*:.*:.*:.*:.*' | cut -d" " -f 6 )
+	echo bla
+	returnstring=$( wget -T30 -q -q -O- "$URL?do=getID&macAddr=$macAddr" )
+	echo keks
+	errorcode=$( echo $returnstring | cut -d"|" -f1 )
+	errormessage=$( echo $returnstring | cut -d"|" -f2 )
+	returndata=$( echo $returnstring | cut -d"|" -f3 )
+	eval "$returndata"
+
+	echo "$returnstring"
+	config_set id ffmap $id
+
+	uci commit
 fi
 
 full_node_update
@@ -212,6 +335,6 @@ URL="$URL?do=update&"$DATA
 
 #length=${#URL}
 #echo "\$URL is $length long"
-#echo $URL
+echo $URL
 
-wget -q -O- $URL
+#wget -T30 -q -O- $URL
