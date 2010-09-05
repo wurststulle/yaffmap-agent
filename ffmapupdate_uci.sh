@@ -122,7 +122,7 @@ interface_addresses(){
 
 
 wifi_device_attributes(){
-	echo "entered wifi_device_attributes()"
+#	echo "entered wifi_device_attributes()"
 	
 	wifi_iface_attributes(){
 #		echo "entered wifi_iface_attributes()"
@@ -324,7 +324,7 @@ URL="$URL?do=update&"$DATA
 
 #length=${#URL}
 #echo "\$URL is $length long"
-echo $URL
+#echo $URL
 
 returnstring=$( wget -T30 -q -O- $URL )
 echo $returnstring
