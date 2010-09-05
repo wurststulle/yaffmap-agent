@@ -184,13 +184,9 @@ network_interfaces(){
 		local isbridge=0
 		local iswireless=0
 		
-#		echo "is $config in $WIRELESS_NETWORKS ?"
 		for net in $WIRELESS_NETWORKS
 		do
-			[ "$net" = "$config" ] && { 
-				iswireless=1
-#				echo "indeed"	
-				}
+			[ "$net" = "$config" ] && { iswireless=1 }
 		done
 		
 		if [ "$iswireless" != "1" ]
@@ -281,6 +277,17 @@ rp_links(){
 	endobj
 }
 
+rf_links(){
+	config_load wireless
+	config_foreach make_dev_list wifi-device
+	for wd in $DEVICES
+	do
+		wifi_device_attributes $wd
+	done
+	config_foreach make_dev_list wifi-iface
+	
+	wlanconfig ath1 list sta | grep -v ADDR | awk -v source="11:22:33:44:55:66" '{print "obj; attr sourceAddr "source"; attr destAddr "$1"; attr rssi "$6"; endobj"}'
+}
 
 full_node_update(){
 	[ "$DEBUG" = "1" ] &&	echo "entered full_node_update()"
@@ -303,6 +310,7 @@ full_node_update(){
 #	fi
     
 		rp_links
+		rf_links
 	endobj
 	rem_trailing_comma
 }
