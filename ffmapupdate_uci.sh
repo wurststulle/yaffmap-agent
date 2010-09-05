@@ -81,7 +81,7 @@ EOF
 wired_default_config(){
 	local config=$1
 	
-	[ "$config" != "loopback" ] && cat <<EOF >> /etc/config/freifunk_map
+	cat <<EOF >> /etc/config/freifunk_map
 
 config wired-iface $config
 	option	'bandwidth'	'100M'
@@ -89,6 +89,8 @@ config wired-iface $config
 	option	'ignore'	'0'
 
 EOF
+
+	[ "$config" != "loopback" ] && uci set freifunk_map.wired-iface.$config=1
 
 }
 
