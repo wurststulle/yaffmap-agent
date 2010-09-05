@@ -85,8 +85,6 @@ wired_default_config(){
 	cat <<EOF >> /etc/config/freifunk_map
 
 config wired-iface $config
-	option	'bandwidth'	'100M'
-	option	'duplex'	'full'
 	option	'ignore'	'0'
 
 EOF
