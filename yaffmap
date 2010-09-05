@@ -273,11 +273,12 @@ EOM
 }
 
 rp_links(){
-  for config in /var/etc/olsrd.conf /var/etc/olsrd-ipv6.conf
-  do
-    [ -e $config ] && olsr_links $config
-  done
-  DATA="$DATA$1"
+	obj neighbour
+	  for config in /var/etc/olsrd.conf /var/etc/olsrd-ipv6.conf
+  	do
+    	[ -e $config ] && olsr_links $config
+	  done
+	endobj
 }
 
 
@@ -287,25 +288,36 @@ full_node_update(){
 #  then
     DATA="node="
     obj
-    	config_get_batch ffmap id interval timeout
-      attr id $nodeid ,
-      attr updateInterval $interval ,
-      attr timeout $timeout ,
-#      attr longitude $( nvram get ff_adm_latlon | cut -d"," -f1 | cut -d";" -f1 ) ,
-#      attr latitude $( nvram get ff_adm_latlon | cut -d"," -f2 | cut -d";" -f2 | sed 's/ //g' ) ,
-      attr hostname $( uname -n )
+			config_get_batch ffmap id interval timeout
+			attr id $nodeid ,
+			attr updateInterval $interval ,
+			attr timeout $timeout ,
+#			attr longitude $( nvram get ff_adm_latlon | cut -d"," -f1 | cut -d";" -f1 ) ,
+#			attr latitude $( nvram get ff_adm_latlon | cut -d"," -f2 | cut -d";" -f2 | sed 's/ //g' ) ,
+			attr hostname $( uname -n )
 
 			network_interfaces
-#      echo $DATA > /tmp/ff_map_cache
-#  else
-#    DATA=$( cat /tmp/ff_map_cache )
-#  fi
+#			echo $DATA > /tmp/ff_map_cache
+#	else
+#		DATA=$( cat /tmp/ff_map_cache )
+#	fi
     
-    obj neighbour
-      rp_links
-    endobj
-  endobj
-  rem_trailing_comma
+		rp_links
+	endobj
+	rem_trailing_comma
+}
+
+getid(){
+	macAddr=$( ip addr show dev eth0 | grep -e '.*:.*:.*:.*:.*:.*' | cut -d" " -f 6 )
+	returnstring=$( wget -T30 -q -q -O- "$URL?do=getID&macAddr=$macAddr" )
+	errorcode=$( echo $returnstring | cut -d"|" -f1 )
+	errormessage=$( echo $returnstring | cut -d"|" -f2 )
+	returndata=$( echo $returnstring | cut -d"|" -f3 )
+
+	eval "$returndata"
+
+	uci set freifunk_map.ffmap.id="$id"
+	uci commit
 }
 
 start(){
@@ -321,17 +333,7 @@ config 'ffmap' 'ffmap'
 
 EOF
 
-		macAddr=$( ip addr show dev eth0 | grep -e '.*:.*:.*:.*:.*:.*' | cut -d" " -f 6 )
-		returnstring=$( wget -T30 -q -q -O- "$URL?do=getID&macAddr=$macAddr" )
-		errorcode=$( echo $returnstring | cut -d"|" -f1 )
-		errormessage=$( echo $returnstring | cut -d"|" -f2 )
-		returndata=$( echo $returnstring | cut -d"|" -f3 )
-	
-		eval "$returndata"
-
-		uci set freifunk_map.ffmap.id="$id"
-		uci commit
-	
+		getid
 	fi
 	
 	config_load freifunk_map
@@ -352,8 +354,8 @@ update(){
 	config_get nodeid ffmap id
 	if [ "$nodeid" = "0" -o -z "$nodeid" ] 
 	then
-		echo "Error while getting ID. NodeID is 0 or empty."
-		return 0
+		echo "Error while getting ID. NodeID is 0 or empty. Retrieving a new one"
+		getid
 	fi
 
 	full_node_update
