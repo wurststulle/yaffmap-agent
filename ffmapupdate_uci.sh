@@ -326,7 +326,7 @@ URL="$URL?do=update&"$DATA
 
 #length=${#URL}
 #echo "\$URL is $length long"
-#echo $URL
+echo $URL
 
 returnstring=$( wget -T30 -q -O- $URL )
 echo $returnstring
