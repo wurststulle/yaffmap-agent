@@ -92,7 +92,6 @@ EOF
 }
 
 interface_addresses(){
-
 	ip_params(){		
 		local config=$1
 		config_get_batch "$config" ipaddr ip6addr
@@ -133,17 +132,16 @@ wifi_device_attributes(){
 		if [ "$device" = "$2" ]
 		then
 			config_get_batch "$config" ssid bssid mode ifname
-			
 			obj
 				[ -n "$ssid" ] && attr essid $ssid
 				[ -n "$bssid" ] && attr bssid $bssid
 				[ -n "$mode" ] && attr wlMode $mode
 				config_get network "$config" network
-				config_get ifname "$network" ifname
+				config_get ifname "$config" ifname
 				attr name $ifname
 				wlmac=$( ip addr show dev $ifname | grep -e '.*:.*:.*:.*:.*:.*' | cut -d" " -f 6 )
 				attr wlMacAddr $wlmac
-				interface_addresses $network -w
+				interface_addresses $network
 			endobj
 		fi
 	} 
@@ -152,16 +150,13 @@ wifi_device_attributes(){
 	
 	[ "$VIRGIN_MODE" = "1" ] && wifi_default_config	$config
 	
-	config_load freifunk_map
-	config_get ignore "$config" ignore
+	ignore=$(uci get freifunk_map.$config.ignore)
 	
 	if [ "$ignore" != "1" ]
 	then
-		config_load wireless
-
 		config_get_batch "$config" type channel hwmode txpower macaddr antDirection antGain antBeamH antBeamV antPol antTilt macaddr
 		obj
-			[ "$type" = "atheros" ] && attr name $config
+			attr name $config
 			
 			for s in antDirection antGain antBeamH antBeamV antPol antTilt channel txpower
 			do
@@ -175,7 +170,7 @@ wifi_device_attributes(){
 			endarr
 		endobj
 	fi
-} 
+}
 
 network_interfaces(){
 #  echo "entered network_interfaces()"
@@ -183,12 +178,10 @@ network_interfaces(){
 		local config=$1
 		local isbridge=0
 		
-		[ "$VIRGIN_MODE" = "1" ] && wired_default_config	$config
+		[ "$VIRGIN_MODE" = "1" ] && wired_default_config $config
 
-		config_load freifunk_map
-		config_get ignore "$config" ignore
-		config_load network
-
+		ignore=$(uci get freifunk_map.$config.ignore)
+		
 		if [ "$ignore" != "1" ]
 		then
 			obj
@@ -198,6 +191,10 @@ network_interfaces(){
 			endobj
 		fi
 	}
+	
+	make_widev_list(){
+		WIFI_DEVICES="$WIFI_DEVICES $1"
+	}
 
 	array wiredIface
 		config_load network
@@ -206,19 +203,12 @@ network_interfaces(){
 	endarr
 
 	array wlDevice
-		config_cb(){
-			case "$1" in
-				"wifi-device" ) WIFI_DEVICES="$WIFI_DEVICES $2"
-				;;
-			esac
-		}
 		config_load wireless
-		reset_cb
+		config_foreach make_widev_list wifi-device
 		for wd in $WIFI_DEVICES
 		do
 			wifi_device_attributes $wd
 		done
-#		config_foreach wifi_device_attributes wifi-device
 	endarr
 }
 
