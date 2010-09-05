@@ -79,8 +79,9 @@ EOF
 }
 
 wired_default_config(){
-
-cat <<EOF >> /etc/config/freifunk_map
+	local config=$1
+	
+	[ "$config" != "loopback" ] && cat <<EOF >> /etc/config/freifunk_map
 
 config wired-iface $config
 	option	'bandwidth'	'100M'
@@ -122,10 +123,10 @@ interface_addresses(){
 
 
 wifi_device_attributes(){
-#	echo "entered wifi_device_attributes()"
+	echo "entered wifi_device_attributes() $1"
 	
 	wifi_iface_attributes(){
-#		echo "entered wifi_iface_attributes()"
+		echo "entered wifi_iface_attributes() $1"
 		local config="$1"
 	
 		config_get device "$config" device
@@ -173,8 +174,9 @@ wifi_device_attributes(){
 }
 
 network_interfaces(){
-#  echo "entered network_interfaces()"
+  echo "entered network_interfaces()"
 	network_iface(){
+		echo "entered network_iface() $1"
 		local config=$1
 		local isbridge=0
 		
