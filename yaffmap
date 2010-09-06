@@ -64,6 +64,11 @@ config_get_batch(){
 	done
 }
 
+make_dev_list(){
+	DEVICES="$DEVICES $1"
+}
+
+
 wifi_default_config(){
 	cat <<EOF >> /etc/config/freifunk_map
 
@@ -186,7 +191,7 @@ network_interfaces(){
 		
 		for net in $WIRELESS_NETWORKS
 		do
-			[ "$net" = "$config" ] && { iswireless=1 }
+			[ "$net" = "$config" ] && iswireless=1
 		done
 		
 		if [ "$iswireless" != "1" ]
@@ -206,9 +211,6 @@ network_interfaces(){
 		fi
 	}
 	
-	make_dev_list(){
-		DEVICES="$DEVICES $1"
-	}
 
 	config_load network
 	scan_interfaces
@@ -220,7 +222,6 @@ network_interfaces(){
 		do
 			wifi_device_attributes $wd
 		done
-		config_foreach make_dev_list wifi-iface
 	endarr
 
 	array wiredIface
@@ -278,41 +279,104 @@ rp_links(){
 }
 
 rf_links(){
-	config_load wireless
-	config_foreach make_dev_list wifi-device
-	for wd in $DEVICES
-	do
-		wifi_device_attributes $wd
-	done
-	config_foreach make_dev_list wifi-iface
+	[ "$DEBUG" = "1" ] &&	echo "entered rf_links()"
+
+	rflinks_wifi_iface(){
+		[ "$DEBUG" = "1" ] &&	echo "entered rflinks_wifi_iface()"
+
+		local config=$1
+		config_get device "$config" device
+		
+		if [ "$device" = "$2" ]
+		then
+			config_get ifname $config ifname
+			macaddr=$( ip addr show dev $ifname | grep -e '.*:.*:.*:.*:.*:.*' | cut -d" " -f 6 )
+			case $3 in
+				atheros)	temp=$( wlanconfig $ifname list sta | grep -v ADDR | awk -v source=$macaddr '{print "obj; attr sourceAddr "source"; attr destAddr "$1"; attr rssi "$6"; endobj"}' )
+									eval "$temp"
+					;;
+				mac80211)	temp=$(iw $ifname station dump | awk -v source=$macaddr '{
+										if($1~/Station/) print "obj;attr sourceAddr "source";attr destAddr "$2";";
+										if($1~/signal/) print "attr rssi "$2";";
+										if($0~/tx bitrate/) print "attr rateControlEffBw "$3";endobj;"}' )
+									eval "$temp"
+					;;
+			esac
+		fi
+	}
+
+	rflinks_wifi_device(){
+		[ "$DEBUG" = "1" ] &&	echo "entered rflinks_wifi_device()"
+
+		local config=$1
+		config_get type "$config" type
+		config_foreach rflinks_wifi_iface wifi-iface "$config" $type
+	}
 	
-	wlanconfig ath1 list sta | grep -v ADDR | awk -v source="11:22:33:44:55:66" '{print "obj; attr sourceAddr "source"; attr destAddr "$1"; attr rssi "$6"; endobj"}'
+	array rfNeighbour
+		config_load wireless
+		config_foreach make_dev_list wifi-device
+		for wd in $DEVICES
+		do
+			rflinks_wifi_device $wd
+		done
+	endarr
+}
+
+upload(){
+	[ "$DEBUG" = "1" ] &&	echo "entered upload()"
+  
+  config_load freifunk_map
+  obj -v BEGIN
+		config_get id ffmap id
+		attr -v BEGIN id $id
+	
+	endobj
+	rem_trailing_comma
+
+	#URL="$URL?do=testJson&"$DATA
+	TXURL="$URL?do=update&node="$BEGIN$DATA
+
+	[ "$DEBUG" = "1" ] && {
+		length=${#TXURL}
+		echo "\$TXURL is $length long"
+		echo "update-string: $TXURL"
+	}
+
+	returnstring=$( wget -T30 -q -O- $TXURL )
+	echo $returnstring
+	DATA=""
+	TXURL=""
+	BEGIN=""
 }
 
 full_node_update(){
 	[ "$DEBUG" = "1" ] &&	echo "entered full_node_update()"
-#  if [ ! -e /tmp/ff_map_cache ]
-#  then
-    DATA="node="
-    obj
-			config_get_batch ffmap id interval timeout
-			attr id $nodeid ,
-			attr updateInterval $interval ,
-			attr timeout $timeout ,
-#			attr longitude $( nvram get ff_adm_latlon | cut -d"," -f1 | cut -d";" -f1 ) ,
-#			attr latitude $( nvram get ff_adm_latlon | cut -d"," -f2 | cut -d";" -f2 | sed 's/ //g' ) ,
-			attr hostname $( uname -n )
+	config_get_batch ffmap interval timeout
+	attr updateInterval $interval
+	attr timeout $timeout
+	attr hostname $( uname -n )
+		config_get olsrd
+	get_gps_coords(){
+		local config=$1
+		config_get lat $config lat 2>/dev/null
+		config_get lon $config lon 2>/dev/null
+		[ -n "$lat" ] && attr latitude $lat
+		[ -n "$lon" ] && attr longitude $lon
+	}
+	config_foreach get_gps_coords LoadPlugin
+	
+	upload
+		
+	network_interfaces
+	upload
 
-			network_interfaces
-#			echo $DATA > /tmp/ff_map_cache
-#	else
-#		DATA=$( cat /tmp/ff_map_cache )
-#	fi
-    
-		rp_links
-		rf_links
-	endobj
-	rem_trailing_comma
+	rp_links
+	upload
+
+	rf_links
+	upload
+	
 }
 
 getid(){
@@ -334,7 +398,7 @@ start(){
 		[ "$DEBUG" = "1" ] &&	echo "kein config-file"
 		cat <<EOF > /etc/config/freifunk_map
 	
-config 'ffmap' 'ffmap'
+config 'node' 'ffmap'
 	option	'id' '0'
 	option	'interval' '1'
 	option	'timeout' '5'
@@ -367,17 +431,6 @@ update(){
 	fi
 
 	full_node_update
-	#URL="$URL?do=testJson&"$DATA
-	URL="$URL?do=update&"$DATA
-
-	length=${#URL}
-	[ "$DEBUG" = "1" ] && {
-		echo "\$URL is $length long"
-		echo "update-string: $URL"
-	}
-
-	returnstring=$( wget -T30 -q -O- $URL )
-	echo $returnstring
 }
 
 case $1 in
