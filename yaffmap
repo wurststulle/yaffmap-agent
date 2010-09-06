@@ -297,13 +297,13 @@ rf_links(){
 			config_get ifname $config ifname
 			macaddr=$( ip addr show dev $ifname | grep -e '.*:.*:.*:.*:.*:.*' | cut -d" " -f 6 )
 			case $3 in
-				atheros)	temp=$( wlanconfig $ifname list sta | grep -v ADDR | awk -v source=$macaddr '{print "obj; attr sourceAddr "source"; attr destAddr "$1"; attr rssi "$6"; endobj"}' )
+				atheros)	temp=$( wlanconfig $ifname list sta | grep -v ADDR | grep -i -v $macaddr | awk -v source=$macaddr '{print "obj; attr sMAC "source"; attr dMAC "$1"; attr rssi "$6"; endobj"}' )
 									eval "$temp"
 					;;
 				mac80211)	temp=$(iw $ifname station dump | awk -v source=$macaddr '{
-										if($1~/Station/) print "obj;attr sourceAddr "source";attr destAddr "$2";";
+										if($1~/Station/) print "obj;attr sMAC "source";attr dMAC "$2";";
 										if($1~/signal/) print "attr rssi "$2";";
-										if($0~/tx bitrate/) print "attr rateControlEffBw "$3";endobj;"}' )
+										if($0~/tx bitrate/) print "attr txrate "$3";endobj;"}' )
 									eval "$temp"
 					;;
 			esac
@@ -364,41 +364,54 @@ getid(){
 }
 
 
-full_node_update(){
-	[ "$DEBUG" = "1" ] &&	echo "entered full_node_update()"
+update(){
+	[ "$DEBUG" = "1" ] &&	echo "entered update() $1"
 	
-	config_load freifunk_map
-	config_get nodeid ffmap id
-	if [ "$nodeid" = "0" -o -z "$nodeid" ] 
-	then
-		echo "Error while getting ID. NodeID is 0 or empty. Retrieving a new one"
-		getid
-	fi
+	case $1 in
+		node | * )	
+			config_load freifunk_map
+			config_get nodeid ffmap id
+			if [ "$nodeid" = "0" -o -z "$nodeid" ] 
+			then
+				echo "Error while getting ID. NodeID is 0 or empty. Retrieving a new one"
+				getid
+			fi
 	
-	config_get_batch ffmap interval timeout
-	attr updateInterval $interval
-	attr timeout $timeout
-	attr hostname $( uname -n )
-		config_get olsrd
-	get_gps_coords(){
-		local config=$1
-		config_get lat $config lat 2>/dev/null
-		config_get lon $config lon 2>/dev/null
-		[ -n "$lat" ] && attr latitude $lat
-		[ -n "$lon" ] && attr longitude $lon
-	}
-	config_foreach get_gps_coords LoadPlugin
+			config_get_batch ffmap nodeinterval linkinterval timeout
+			attr updateIntervalNode $nodeinterval
+			attr updateIntervalLink $linkinterval
+			attr timeout $timeout
+			attr hostname $( uname -n )
+			config_load olsrd
+			get_gps_coords(){
+				local config=$1
+				config_get lat $config lat 2>/dev/null
+				config_get lon $config lon 2>/dev/null
+				[ -n "$lat" ] && attr latitude $lat
+				[ -n "$lon" ] && attr longitude $lon
+			}
+			config_foreach get_gps_coords LoadPlugin
 	
-	upload
+			upload
 		
-	network_interfaces
-	upload
+			network_interfaces
+			upload
 
-	rp_links
-	upload
+			rp_links
+			upload
 
-	rf_links
-	upload
+			rf_links
+			upload
+			;;
+		link)
+			rp_links
+			upload
+
+			rf_links
+			upload
+			;;
+esac
+			
 	
 }
 
@@ -411,7 +424,8 @@ start(){
 	
 config 'node' 'ffmap'
 	option	'id' '0'
-	option	'interval' '1'
+	option	'nodeinterval' '1'
+	option	'linkinterval' '0.1'
 	option	'timeout' '5'
 
 EOF
@@ -420,11 +434,27 @@ EOF
 	fi
 	
 	config_load freifunk_map
-	config_get interval ffmap interval
+	config_get_batch ffmap nodeinterval linkinterval
 	minutes=$(date | cut -d":" -f2)
-	[ -z "$( grep yaffmap /etc/crontabs/root )" ] && {
-		echo "$minutes */$interval * * * /etc/init.d/yaffmap update" >> /etc/crontabs/root
-		}
+	
+	for s in node link
+	do
+		eval "int=\$${s}interval"
+		dez=$( echo $int | cut -d"." -f1 )
+		fract=$( echo $int | cut -d"." -f2 )
+	
+		if [ -z "$( grep yaffmap /etc/crontabs/root | grep $s )" ]
+		then
+			if [ "$dez" = "0" ]
+			then
+				fract=${fract:0:1}
+				minstep=$( expr 60 \* $fract / 10 )
+				echo "*/$minstep * * * * /etc/init.d/yaffmap update $s" >> /etc/crontabs/root
+			else
+				echo "$minutes */$dez * * * /etc/init.d/yaffmap update $s" >> /etc/crontabs/root
+			fi
+		fi
+	done
 }
 
 stop (){
@@ -435,7 +465,10 @@ stop (){
 case $1 in
 	start|stop) $1
 		;;
-	update) full_node_update
+	update) update $2
+		;;
+	restart)	stop
+						start
 		;;
 	*) echo "usage: $0 start|stop|update"
 esac
