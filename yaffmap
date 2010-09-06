@@ -297,11 +297,11 @@ rf_links(){
 			config_get ifname $config ifname
 			macaddr=$( ip addr show dev $ifname | grep -e '.*:.*:.*:.*:.*:.*' | cut -d" " -f 6 )
 			case $3 in
-				atheros)	temp=$( wlanconfig $ifname list sta | grep -v ADDR | grep -i -v $macaddr | awk -v source=$macaddr '{print "obj; attr sMAC "source"; attr dMAC "$1"; attr rssi "$6"; endobj"}' )
+				atheros)	temp=$( wlanconfig $ifname list sta | grep -v ADDR | grep -i -v $macaddr | awk -v source=$macaddr '{print "obj; attr sMac "source"; attr dMac "$1"; attr rssi "$6"; endobj"}' )
 									eval "$temp"
 					;;
 				mac80211)	temp=$(iw $ifname station dump | awk -v source=$macaddr '{
-										if($1~/Station/) print "obj;attr sMAC "source";attr dMAC "$2";";
+										if($1~/Station/) print "obj;attr sMac "source";attr dMac "$2";";
 										if($1~/signal/) print "attr rssi "$2";";
 										if($0~/tx bitrate/) print "attr txrate "$3";endobj;"}' )
 									eval "$temp"
