@@ -332,8 +332,9 @@ upload(){
 	config_load freifunk_map
 	config_get id ffmap id
 
+	rem_trailing_comma
 	#URL="$URL?do=testJson&"$DATA
-	TXURL="$URL?do=update&node={\"id\"=\"$id\""$BEGIN$DATA"}"
+	TXURL="$URL?do=update&node={\"id\":\"$id\","$BEGIN$DATA"}"
 
 	[ "$DEBUG" = "1" ] && {
 		length=${#TXURL}
