@@ -2,6 +2,8 @@
 . /etc/functions.sh
 include /lib/network/
 
+# script revision: $Revision$
+
 URL="http://wurststulle.dyndns.org/ffmap/build/index.php"
 DEBUG=0
 
