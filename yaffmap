@@ -368,7 +368,14 @@ update(){
 	[ "$DEBUG" = "1" ] &&	echo "entered update() $1"
 	
 	case $1 in
-		node | * )	
+		link)
+			rp_links
+			upload
+
+			rf_links
+			upload
+			;;
+		* )	
 			config_load freifunk_map
 			config_get nodeid ffmap id
 			if [ "$nodeid" = "0" -o -z "$nodeid" ] 
@@ -397,13 +404,6 @@ update(){
 			network_interfaces
 			upload
 
-			rp_links
-			upload
-
-			rf_links
-			upload
-			;;
-		link)
 			rp_links
 			upload
 
