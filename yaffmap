@@ -235,41 +235,44 @@ network_interfaces(){
 	endarr
 }
 
-olsr_links(){
-	[ "$DEBUG" = "1" ] &&	echo "entered olsr_links()"
-	olsr_config=$1
-	obj olsr
-		attr metric $( grep LinkQualityAlgorithm $olsr_config | cut -d" " -f2 | sed 's/"//g' ) 
-		ipversion=$( grep IpVersion $olsr_config | cut -d" " -f2 )
-		attr ipv $ipversion 
-    
-		case "$ipversion" in
-			"4" ) exec<<EOM
-	    $( wget -T30 -q -O- http://127.0.0.1:2006/links | grep -e ^[1-9] )
-EOM
-					;;
-			"6" ) exec<<EOM
-	    $( wget -T30 -q -O- http://[::1]:2006/links | grep -e ^[1-9] )
-EOM
-					;;
-		esac
-
-		array link        
-		while read my_ip n_ip hyst lq nlq etx 
-		do
-			if [ -n "$n_ip" -a "$etx" != "INFINITE" ]; then
-				obj
-					attr sourceAddr $my_ip
-					attr destAddr $n_ip
-					attr metric $lq
-				endobj
-			fi
-		done 
-		endarr 
-	endobj
-}
 
 rp_links(){
+
+	olsr_links(){
+		[ "$DEBUG" = "1" ] &&	echo "entered olsr_links()"
+		olsr_config=$1
+		obj olsr
+			attr metric $( grep LinkQualityAlgorithm $olsr_config | cut -d" " -f2 | sed 's/"//g' ) 
+			ipversion=$( grep IpVersion $olsr_config | cut -d" " -f2 )
+			attr ipv $ipversion 
+	    
+			case "$ipversion" in
+				"4" ) exec<<EOM
+		    $( wget -T30 -q -O- http://127.0.0.1:2006/links | grep -e ^[1-9] )
+EOM
+						;;
+				"6" ) exec<<EOM
+	    	$( wget -T30 -q -O- http://[::1]:2006/links | grep -e ^[1-9] )
+EOM
+						;;
+			esac
+		
+			array link        
+			while read my_ip n_ip hyst lq nlq etx 
+			do
+				if [ -n "$n_ip" -a "$etx" != "INFINITE" ]; then
+					obj
+						attr sourceAddr $my_ip
+						attr destAddr $n_ip	
+						attr metric $lq
+					endobj
+				fi
+			done 
+			endarr 
+		endobj
+	}
+
+
 	obj neighbour
 	  for config in /var/etc/olsrd.conf /var/etc/olsrd-ipv6.conf
   	do
@@ -326,16 +329,11 @@ rf_links(){
 upload(){
 	[ "$DEBUG" = "1" ] &&	echo "entered upload()"
   
-  config_load freifunk_map
-  obj -v BEGIN
-		config_get id ffmap id
-		attr -v BEGIN id $id
-	
-	endobj
-	rem_trailing_comma
+	config_load freifunk_map
+	config_get id ffmap id
 
 	#URL="$URL?do=testJson&"$DATA
-	TXURL="$URL?do=update&node="$BEGIN$DATA
+	TXURL="$URL?do=update&node={\"id\"=\"$id\""$BEGIN$DATA"}"
 
 	[ "$DEBUG" = "1" ] && {
 		length=${#TXURL}
@@ -347,11 +345,33 @@ upload(){
 	echo $returnstring
 	DATA=""
 	TXURL=""
-	BEGIN=""
 }
+
+getid(){
+	macAddr=$( ip addr show dev eth0 | grep -e '.*:.*:.*:.*:.*:.*' | cut -d" " -f 6 )
+	returnstring=$( wget -T30 -q -q -O- "$URL?do=getID&macAddr=$macAddr" )
+	errorcode=$( echo $returnstring | cut -d"|" -f1 )
+	errormessage=$( echo $returnstring | cut -d"|" -f2 )
+	returndata=$( echo $returnstring | cut -d"|" -f3 )
+
+	eval "$returndata"
+
+	uci set freifunk_map.ffmap.id="$id"
+	uci commit
+}
+
 
 full_node_update(){
 	[ "$DEBUG" = "1" ] &&	echo "entered full_node_update()"
+	
+	config_load freifunk_map
+	config_get nodeid ffmap id
+	if [ "$nodeid" = "0" -o -z "$nodeid" ] 
+	then
+		echo "Error while getting ID. NodeID is 0 or empty. Retrieving a new one"
+		getid
+	fi
+	
 	config_get_batch ffmap interval timeout
 	attr updateInterval $interval
 	attr timeout $timeout
@@ -379,18 +399,6 @@ full_node_update(){
 	
 }
 
-getid(){
-	macAddr=$( ip addr show dev eth0 | grep -e '.*:.*:.*:.*:.*:.*' | cut -d" " -f 6 )
-	returnstring=$( wget -T30 -q -q -O- "$URL?do=getID&macAddr=$macAddr" )
-	errorcode=$( echo $returnstring | cut -d"|" -f1 )
-	errormessage=$( echo $returnstring | cut -d"|" -f2 )
-	returndata=$( echo $returnstring | cut -d"|" -f3 )
-
-	eval "$returndata"
-
-	uci set freifunk_map.ffmap.id="$id"
-	uci commit
-}
 
 start(){
 	if [ ! -e /etc/config/freifunk_map ]
@@ -421,21 +429,10 @@ stop (){
 	mv /tmp/yaffmap.tmp /etc/crontabs/root
 }
 
-update(){
-	config_load freifunk_map
-	config_get nodeid ffmap id
-	if [ "$nodeid" = "0" -o -z "$nodeid" ] 
-	then
-		echo "Error while getting ID. NodeID is 0 or empty. Retrieving a new one"
-		getid
-	fi
-
-	full_node_update
-}
-
 case $1 in
-	start|stop|update) $1
+	start|stop) $1
 		;;
+	update) full_node_update
 	*) echo "usage: $0 start|stop|update"
 esac
 	
