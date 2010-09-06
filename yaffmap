@@ -433,6 +433,7 @@ case $1 in
 	start|stop) $1
 		;;
 	update) full_node_update
+		;;
 	*) echo "usage: $0 start|stop|update"
 esac
 	
