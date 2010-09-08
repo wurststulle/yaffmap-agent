@@ -10,8 +10,6 @@ get_dnssuffix(){
 config_load olsrd
 config_foreach get_dnssuffix LoadPlugin
 
-echo $suffix
-
 cp /var/etc/hosts.olsr $TEMP_DIR
 cp /var/run/latlon.js $TEMP_DIR
 
@@ -24,6 +22,7 @@ chmod 755 latlon_crawler.awk
 awk '
 BEGIN{
 	print "BEGIN{"
+	print "print \"array node;\""
 }
 {
 if ($2!~/^mid[1-9]\./)
@@ -52,7 +51,7 @@ if (\$1~mainip) {
 	}
 	if  (\$1~/^Node/ ) {
 		gsub("Node(","")
-		print "obj node;attr name "\$6";attr latitude "\$2";attr longitude "\$3";array iface;"
+		print "obj;attr name "\$6";attr latitude "\$2";attr longitude "\$3";array iface;"
 		print "obj;attr ipv4addr "\$1";endobj;"mid[\$1]"endarr;endobj;"
 		hostplussuffix=\$6"$suffix"
 		for ( s in hosts_names ) {
@@ -66,8 +65,9 @@ if (\$1~mainip) {
 END{
 for ( s in hosts_names ) {
 	split( s, separate, "," )
-	print "obj node;attr name "separate[1]";array iface;obj;attr ipv4addr "separate[2]":endobj;endarr"
+	print "obj;attr name "separate[1]";array iface;obj;attr ipv4addr "separate[2]":endobj;endarr"
 }
+print "endarr"
 }
 EOM
 
