@@ -21,18 +21,6 @@ EOF
 
 chmod 755 latlon_crawler.awk
 
-#exec << EOM
-# $( grep -v -e  mid[1-9]\. ./hosts.olsr  | grep ^[1-9] | grep -v 127\.0\.0\.1 ) 
-#EOM
-#
-#n=0
-#
-#while read mainip hostname comment
-#do 
-#	n = `expr $n + 1 `
-#	echo "hosts_name[$n,\"name\"]=\"$hostname\"; hosts_name[$n,\"ip\"]=\"$mainip\""
-#done 
-
 awk '
 BEGIN{
 	print "BEGIN{"
