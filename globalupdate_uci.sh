@@ -48,10 +48,9 @@ if (\$1~mainip) {
 
 	if ( \$1~/^Mid/ ) {
 		gsub("Mid(","")
-		mid[\$1]=mid[$1]"obj;attr ipv4Addr "\$2";endobj;"
+		mid[\$1]=mid[\$1]"obj;attr ipv4Addr "\$2";endobj;"
 	}
 	if  (\$1~/^Node/ ) {
-		captureresult=""
 		gsub("Node(","")
 		print "obj node;attr name "\$6";attr latitude "\$2";attr longitude "\$3";array iface;"
 		print "obj;attr ipv4addr "\$1";endobj;"mid[\$1]"endarr;endobj;"
