@@ -336,20 +336,26 @@ rf_links(){
 }
 
 upload_error(){
-	local returnstring=$1
+	local returnstring="$1"
 	
 	errorcode=$( echo $returnstring | cut -d"|" -f1 )
 	errormessage=$( echo $returnstring | cut -d"|" -f2 )
 	returndata=$( echo $returnstring | cut -d"|" -f3 )
 
-	[ "$DEBUG" = "1" ] && echo "update returnstring: $returnstring"
+	if [ "$DEBUG" = "1" ]
+	then
+		length=${#TXURL}
+		echo "\$TXURL is $length long"
+		echo "upload-string: $TXURL"
+		echo "update returnstring: $returnstring"
+	fi
 
 	if [ ! "$errorcode" = "0" ] 
 	then
 		echo "Map Server returned error"
 		echo "Error Code: $errorcode"
 		echo "Error Text: $errormessage"
-		echo "Transmit URL: $TXURL"
+		echo "Transmit String: $TXURL"
 		echo
 		UPLOAD_SUCCESSFUL=0
 	fi
@@ -362,25 +368,37 @@ upload(){
 	config_get id ffmap id
 
 	rem_trailing_comma
-	TXURL="$URL?do=update&node={\"id\":\"$id\","$DATA"}"
-
-	upload_error $( wget -T30 -q -O- $TXURL )	
-	
-	if [ "$DEBUG" = "1" ]
+	if [ -z "$1" ]
 	then
-		length=${#TXURL}
-		echo "\$TXURL is $length long"
-		echo "update-string: $TXURL"
-		echo "update returnstring: $returnstring"
+		TXURL="$URL?do=update&node={\"id\":\"$id\","$DATA"}"
+	else
+		TXURL="$1"
 	fi
+
+	upload_error "$( wget -T30 -q -O- $TXURL )"
 
 	DATA=""
 	TXURL=""
 }
 
 getid(){
-	macAddr=$( ip addr show dev eth0 | grep -e '.*:.*:.*:.*:.*:.*' | cut -d" " -f 6 )
-	upload_error $( wget -T30 -q -O- "$URL?do=getID&macAddr=$macAddr" )
+	eval $( ip addr | awk '
+	{
+		if($0~/ether/){
+			ether=$2 }
+		if($0~/inet /){
+		  split($2,tmp,"/")
+		  ip=tmp[1]
+		  if(ether){
+				print "macaddr="ether";ip="ip
+				exit
+			}
+		}
+	}' )
+
+	[ "$GETIDIP" = "1" ] && ip_addon="&ipv4Addr=$ip"
+	
+	upload "$URL?do=getID&macAddr=$macaddr$ip_addon"
 
 	eval "$returndata"
 
@@ -497,13 +515,15 @@ do
 	case $s in
 		"-q") 
 			QUIET=1
-			args=$( echo $args | sed 's/-q//g' )
 			;;
 		"-v")	
 			DEBUG=1
-			args=$( echo $args | sed 's/-v//g' )
+			;;
+		"--getidip")
+			GETIDIP=1
 			;;
 	esac
+	args=$( echo $args | sed 's/$s//g' )	
 done
 
 case $( echo $args | cut -d" " -f1 ) in
@@ -517,7 +537,8 @@ case $( echo $args | cut -d" " -f1 ) in
 	*)	
 			echo "usage: $0 [options] start|stop|update"
 			echo "	options:"
-			echo "	-v	show debug output"
-			echo "	-q	do not show show success or error messages"
+			echo "	-v				show debug output"
+			echo "	-q				do not show show success or error messages"
+			echo "	--getidip	use also IP address to retrieve nideID from map server"
 esac
 	
