@@ -5,7 +5,12 @@ include /lib/network/
 # script revision: $Revision$
 
 URL="http://wurststulle.dyndns.org/ffmap/build/index.php"
+
+#######
+# do not alter variables from unless you know what you are doing
+UPLOAD_SUCCESSFUL=1
 DEBUG=0
+QUIET=0
 
 #######
 # JSON helper
@@ -260,13 +265,15 @@ EOM
 			esac
 		
 			array link        
-			while read my_ip n_ip hyst lq nlq etx 
+			while read my_ip n_ip lq nlq etx 
 			do
 				if [ -n "$n_ip" -a "$etx" != "INFINITE" ]; then
 					obj
 						attr sourceAddr $my_ip
 						attr destAddr $n_ip	
-						attr metric $lq
+						attr rx $lq
+						attr tx $nlq
+						attr cost $etx
 					endobj
 				fi
 			done 
@@ -328,6 +335,26 @@ rf_links(){
 	endarr
 }
 
+upload_error(){
+	local returnstring=$1
+	
+	errorcode=$( echo $returnstring | cut -d"|" -f1 )
+	errormessage=$( echo $returnstring | cut -d"|" -f2 )
+	returndata=$( echo $returnstring | cut -d"|" -f3 )
+
+	[ "$DEBUG" = "1" ] && echo "update returnstring: $returnstring"
+
+	if [ ! "$errorcode" = "0" ] 
+	then
+		echo "Map Server returned error"
+		echo "Error Code: $errorcode"
+		echo "Error Text: $errormessage"
+		echo "Transmit URL: $TXURL"
+		echo
+		UPLOAD_SUCCESSFUL=0
+	fi
+}
+
 upload(){
 	[ "$DEBUG" = "1" ] &&	echo "entered upload()"
   
@@ -335,27 +362,25 @@ upload(){
 	config_get id ffmap id
 
 	rem_trailing_comma
-	#URL="$URL?do=testJson&"$DATA
-	TXURL="$URL?do=update&node={\"id\":\"$id\","$BEGIN$DATA"}"
+	TXURL="$URL?do=update&node={\"id\":\"$id\","$DATA"}"
 
-	[ "$DEBUG" = "1" ] && {
+	upload_error $( wget -T30 -q -O- $TXURL )	
+	
+	if [ "$DEBUG" = "1" ]
+	then
 		length=${#TXURL}
 		echo "\$TXURL is $length long"
 		echo "update-string: $TXURL"
-	}
+		echo "update returnstring: $returnstring"
+	fi
 
-	returnstring=$( wget -T30 -q -O- $TXURL )
-	echo $returnstring
 	DATA=""
 	TXURL=""
 }
 
 getid(){
 	macAddr=$( ip addr show dev eth0 | grep -e '.*:.*:.*:.*:.*:.*' | cut -d" " -f 6 )
-	returnstring=$( wget -T30 -q -q -O- "$URL?do=getID&macAddr=$macAddr" )
-	errorcode=$( echo $returnstring | cut -d"|" -f1 )
-	errormessage=$( echo $returnstring | cut -d"|" -f2 )
-	returndata=$( echo $returnstring | cut -d"|" -f3 )
+	upload_error $( wget -T30 -q -O- "$URL?do=getID&macAddr=$macAddr" )
 
 	eval "$returndata"
 
@@ -366,24 +391,25 @@ getid(){
 
 update(){
 	[ "$DEBUG" = "1" ] &&	echo "entered update() $1"
+	do="$1"
+
+	config_load freifunk_map
+	config_get nodeid ffmap id
+	if [ "$nodeid" = "0" -o -z "$nodeid" ] 
+	then
+		[ "$QUIET" = "0" ] && echo "Error while getting ID. NodeID is 0 or empty. Retrieving a new one"
+		getid
+		do="full"
+	fi
 	
 	case $1 in
 		link)
 			rp_links
 			upload
-
 			rf_links
 			upload
 			;;
 		* )	
-			config_load freifunk_map
-			config_get nodeid ffmap id
-			if [ "$nodeid" = "0" -o -z "$nodeid" ] 
-			then
-				echo "Error while getting ID. NodeID is 0 or empty. Retrieving a new one"
-				getid
-			fi
-	
 			config_get_batch ffmap nodeinterval linkinterval timeout
 			attr updateIntervalNode $nodeinterval
 			attr updateIntervalLink $linkinterval
@@ -410,8 +436,9 @@ update(){
 			rf_links
 			upload
 			;;
-esac
-			
+	esac
+
+	[ "$UPLOAD_SUCCESSFUL" = "1" ] && [ "$QUIET" = "0" ] && echo "Update successful. Server reported no errors."
 	
 }
 
@@ -462,7 +489,24 @@ stop (){
 	mv /tmp/yaffmap.tmp /etc/crontabs/root
 }
 
-case $1 in
+
+args=$@
+
+for s in $@
+do
+	case $s in
+		"-q") 
+			QUIET=1
+			args=$( echo $args | sed 's/-q//g' )
+			;;
+		"-v")	
+			DEBUG=1
+			args=$( echo $args | sed 's/-v//g' )
+			;;
+	esac
+done
+
+case $( echo $args | cut -d" " -f1 ) in
 	start|stop) $1
 		;;
 	update) update $2
@@ -470,6 +514,10 @@ case $1 in
 	restart)	stop
 						start
 		;;
-	*) echo "usage: $0 start|stop|update"
+	*)	
+			echo "usage: $0 [options] start|stop|update"
+			echo "	options:"
+			echo "	-v	show debug output"
+			echo "	-q	do not show show success or error messages"
 esac
 	
