@@ -7,10 +7,12 @@ include /lib/network/
 URL="http://wurststulle.dyndns.org/ffmap/build/index.php"
 
 #######
-# do not alter variables from unless you know what you are doing
+# do not alter variables from here on unless you know what you are doing
 UPLOAD_SUCCESSFUL=1
+PRETEND_UPLOAD=0
 DEBUG=0
 QUIET=0
+TEMP_DIR=/tmp
 
 #######
 # JSON helper
@@ -20,16 +22,23 @@ app(){
 }
 
 rem_trailing_comma(){
-	DATA=$( echo $DATA | sed s/.$// )
+	if [ -z "$1" ]
+	then
+		DATA=$( echo $DATA | sed s/.$// )
+	else
+		[ "$1" = "-v" ] && eval "$2=\$( echo \$$2 | sed s/\.\$// )"
+	fi
 }
 
 json_helper(){
+	local tail var
 	do="$1"
 	shift
 	
   if [ "$1" = "-v" ]
   then
   	var=$2
+  	arg=$1
   	shift;shift
   else
     var="DATA"
@@ -39,14 +48,14 @@ json_helper(){
       "obj")		[ -n "$1" ] && app $var "\\\"$1\\\":"
 								app $var "{"
       					;;
-			"endobj")	rem_trailing_comma
+			"endobj")	rem_trailing_comma $arg $var
 								app $var "},"
 								;;
 			"array")	
 								[ -n "$1" ] && app $var "\\\"$1\\\":"
 								app $var "["
 								;;
-			"endarr")	rem_trailing_comma
+			"endarr")	rem_trailing_comma $arg $var
 								app $var "],"
       					;;
       "attr")		
@@ -335,6 +344,7 @@ rf_links(){
 	endarr
 }
 
+
 upload_error(){
 	local returnstring="$1"
 	
@@ -353,8 +363,11 @@ upload_error(){
 	if [ ! "$errorcode" = "0" ] 
 	then
 		echo "Map Server returned error"
+		echo 
 		echo "Error Code: $errorcode"
+		echo 
 		echo "Error Text: $errormessage"
+		echo 
 		echo "Transmit String: $TXURL"
 		echo
 		UPLOAD_SUCCESSFUL=0
@@ -364,22 +377,114 @@ upload_error(){
 upload(){
 	[ "$DEBUG" = "1" ] &&	echo "entered upload()"
   
-	config_load freifunk_map
-	config_get id ffmap id
-
 	rem_trailing_comma
-	if [ -z "$1" ]
+	if [ -n "$1" ]
 	then
-		TXURL="$URL?do=update&node={\"id\":\"$id\","$DATA"}"
-	else
 		TXURL="$1"
+	else
+		TXURL="$URL$UPLOADPREFIX$DATA$UPLOADAPPENDIX"
 	fi
 
-	upload_error "$( wget -T30 -q -O- $TXURL )"
+	if [ "$PRETEND_UPLOAD" = "1" ]
+	then
+		echo "This would have been transmitted without '-p':"
+		echo "$TXURL"
+	else
+		upload_error "$( wget -T30 -q -O- $TXURL )"
+	fi
 
 	DATA=""
 	TXURL=""
 }
+
+upload_split_check(){
+	length=${#DATA}
+	if [ $length -gt 1500 ]
+	then
+		upload
+		DATA=""
+	fi
+}
+
+olsr_global_update(){
+
+	UPLOADPREFIX="?do=globalUpdate&node="
+	obj -v UPLOADPREFIX
+	array -v UPLOADPREFIX node
+	endarr -v UPLOADAPPENDIX
+	endobj -v UPLOADAPPENDIX
+	rem_trailing_comma -v UPLOADAPPENDIX
+
+	get_dnssuffix(){
+		config_get suffix "$1" suffix
+	}
+	
+	config_load olsrd
+	config_foreach get_dnssuffix LoadPlugin
+	
+	cp /var/etc/hosts.olsr $TEMP_DIR
+	cp /var/run/latlon.js $TEMP_DIR
+	
+	cat <<EOF > $TEMP_DIR/latlon_crawler.awk
+#!/usr/bin/awk -f
+BEGIN{
+EOF
+
+	chmod 755 $TEMP_DIR/latlon_crawler.awk
+
+	awk '
+	{
+	if ($2!~/^mid[1-9]\./)
+		if ($1~/^[1-9]/) 
+			if ($1!~/127\.0\.0\./) {
+				print "	hosts_names[\""$2","$1"\"]" 
+			}
+	}
+	' $TEMP_DIR/hosts.olsr >> $TEMP_DIR/latlon_crawler.awk
+
+
+
+	cat <<EOM >> $TEMP_DIR/latlon_crawler.awk
+	}
+	{
+		gsub(");","")
+		gsub(","," ")
+		gsub("'","")
+	
+		if ( \$1~/^Mid/ ) {
+			gsub("Mid(","")
+			mid[\$1]=mid[\$1]"obj;attr ipv4Addr "\$2";endobj;"
+		}
+		if  (\$1~/^Node/ ) {
+			gsub("Node(","")
+			print "obj;attr name "\$6";attr latitude "\$2";attr longitude "\$3";array iface;"
+			print "obj;attr ipv4addr "\$1";endobj;"mid[\$1]"endarr;endobj;upload_split_check;"
+			delete mid[\$1]
+			hostplussuffix=\$6"$suffix"
+			for ( s in hosts_names ) {
+				split( s, separate, "," )
+				if ( separate[1] == hostplussuffix )
+					delete hosts_names[s]
+			}
+	}
+	}
+	END{
+		for ( s in hosts_names ) {
+			split( s, separate, "," )
+			print "obj;attr name "separate[1]";array iface;obj;attr ipv4addr "separate[2]";endobj;"mid[separate[2]]"endarr;endobj;upload_split_check;"
+			delete mid[separate[2]]
+		}
+		for ( m in mid ){
+			print "obj;array iface;obj;attr ipv4addr "m";endobj;"mid[m]"endarr;endobj;upload_split_check;"
+			}
+	}
+EOM
+
+	eval "$( $TEMP_DIR/latlon_crawler.awk $TEMP_DIR/latlon.js )"
+	upload
+	rm $TEMP_DIR/latlon_crawler.awk $TEMP_DIR/latlon.js $TEMP_DIR/hosts.olsr
+}
+
 
 getid(){
 	eval $( ip addr | awk '
@@ -419,6 +524,13 @@ update(){
 		getid
 		do="full"
 	fi
+
+	UPLOADPREFIX="?do=update&node="
+	obj -v UPLOADPREFIX
+		attr -v UPLOADPREFIX id $nodeid
+	
+	endobj -v UPLOADAPPENDIX
+	rem_trailing_comma -v UPLOADAPPENDIX
 	
 	case $1 in
 		link)
@@ -456,7 +568,10 @@ update(){
 			;;
 	esac
 
-	[ "$UPLOAD_SUCCESSFUL" = "1" ] && [ "$QUIET" = "0" ] && echo "Update successful. Server reported no errors."
+	[ "$UPLOAD_SUCCESSFUL" = "1" ] && 
+		[ "$QUIET" = "0" ] && 
+			[ "$PRETEND_UPLOAD" = "0" ] && 
+				echo "Update successful. Server reported no errors."
 	
 }
 
@@ -522,6 +637,9 @@ do
 		"--getidip")
 			GETIDIP=1
 			;;
+		"-p")
+			PRETEND_UPLOAD=1
+			;;
 	esac
 	args=$( echo $args | sed 's/$s//g' )	
 done
@@ -531,14 +649,17 @@ case $( echo $args | cut -d" " -f1 ) in
 		;;
 	update) update $2
 		;;
+	global)	olsr_global_update
+		;;
 	restart)	stop
 						start
 		;;
 	*)	
 			echo "usage: $0 [options] start|stop|update"
 			echo "	options:"
-			echo "	-v				show debug output"
-			echo "	-q				do not show show success or error messages"
+			echo "	-v		show debug output"
+			echo "	-q		do not show show success or error messages"
+			echo "	-p		prentend upload"
 			echo "	--getidip	use also IP address to retrieve nideID from map server"
 esac
 	

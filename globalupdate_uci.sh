@@ -3,6 +3,59 @@
 
 TEMP_DIR="."
 
+#######
+# JSON helper
+# These functions are filling up the variable DATA if not called with the arguments -v <Variable name>.
+app(){
+  eval "$1=\"\$$1$2\""
+}
+
+rem_trailing_comma(){
+	DATA=$( echo $DATA | sed s/.$// )
+}
+
+json_helper(){
+	do="$1"
+	shift
+	
+  if [ "$1" = "-v" ]
+  then
+  	var=$2
+  	shift;shift
+  else
+    var="DATA"
+  fi
+
+		case $do in
+      "obj")		[ -n "$1" ] && app $var "\\\"$1\\\":"
+								app $var "{"
+      					;;
+			"endobj")	rem_trailing_comma
+								app $var "},"
+								;;
+			"array")	
+								[ -n "$1" ] && app $var "\\\"$1\\\":"
+								app $var "["
+								;;
+			"endarr")	rem_trailing_comma
+								app $var "],"
+      					;;
+      "attr")		
+      					app $var "\\\"$1\\\":\\\"$2\\\","
+      					;;
+    esac
+}
+
+for s in obj endobj array endarr attr
+do
+	eval "alias $s=\"json_helper $s\""
+done
+
+#
+#######
+
+
+
 get_dnssuffix(){
 	config_get suffix "$1" suffix
 }
@@ -19,18 +72,6 @@ BEGIN{
 EOF
 
 chmod 755 latlon_crawler.awk
-
-#wget -O- -q http://127.0.0.1:2006/mid | awk '{
-#	if ($1~/^[1-9]/){
-#		gsub(";"," ")
-#		for (i = 2; i <= NF; i++)
-#			temp=temp"obj;attr ipv4Addr "$i";endobj;"
-#			
-#		print "	mid["$1"]=\""temp"\""
-#		temp=""
-#	}
-#}
-#' >> $TEMP_DIR/latlon_crawler.awk
 
 awk '
 {
@@ -76,12 +117,12 @@ END{
 		delete mid[separate[2]]
 	}
 	for ( m in mid ){
-		print "m: "m" mid[m]: "mid[m]
 		print "obj;array iface;attr ipv4addr "m";endobj;"mid[m]"endarr;endobj;"
 		}
 	print "endarr"
 }
 EOM
 
-$TEMP_DIR/latlon_crawler.awk $TEMP_DIR/latlon.js
-#rm $TEMP_DIR/latlon_crawler.awk $TEMP_DIR/latlon.js $TEMP_DIR/hosts.olsr
+eval "$( $TEMP_DIR/latlon_crawler.awk $TEMP_DIR/latlon.js )"
+echo $DATA
+rm $TEMP_DIR/latlon_crawler.awk $TEMP_DIR/latlon.js $TEMP_DIR/hosts.olsr
