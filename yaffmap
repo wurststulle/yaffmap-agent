@@ -659,7 +659,7 @@ case $( echo $args | cut -d" " -f1 ) in
 			echo "	options:"
 			echo "	-v		show debug output"
 			echo "	-q		do not show show success or error messages"
-			echo "	-p		prentend upload"
-			echo "	--getidip	use also IP address to retrieve nideID from map server"
+			echo "	-p		pretend upload"
+			echo "	--getidip	use also IP address to retrieve nodeID from map server"
 esac
 	
