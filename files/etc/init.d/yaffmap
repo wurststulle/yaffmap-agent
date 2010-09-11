@@ -142,6 +142,8 @@ update(){
 			rf_links
 			upload
 			;;
+		global)	olsr_global_update
+			;;
 		* )	
 			load_node_data	
 			attr updateIntervalNode $nodeinterval
@@ -206,8 +208,6 @@ case $( echo $args | cut -d" " -f1 ) in
 	start|stop) $1
 		;;
 	update) update $2
-		;;
-	global)	olsr_global_update
 		;;
 	restart)	stop
 						start
