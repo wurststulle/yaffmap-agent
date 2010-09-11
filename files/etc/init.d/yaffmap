@@ -1,0 +1,224 @@
+#!/bin/sh
+. /etc/functions.sh
+include /lib/network/
+
+# script revision: $Revision$
+
+URL="http://wurststulle.dyndns.org/ffmap/build/index.php"
+
+#######
+# do not alter variables from here on unless you know what you are doing
+UPLOAD_SUCCESSFUL=1
+PRETEND_UPLOAD=0
+DEBUG=0
+QUIET=0
+TEMP_DIR=/tmp
+
+. /lib/yaffmap/json_helper
+
+. /lib/yaffmap/uci_common
+
+. /lib/yaffmap/rp_olsr_common
+
+rp_links(){
+	obj neighbour
+	  for config in /var/etc/olsrd.conf /var/etc/olsrd-ipv6.conf
+  	do
+    	[ -e $config ] && olsr_links $config
+	  done
+	endobj
+}
+
+upload_error(){
+	local returnstring="$1"
+	
+	errorcode=$( echo $returnstring | cut -d"|" -f1 )
+	errormessage=$( echo $returnstring | cut -d"|" -f2 )
+	returndata=$( echo $returnstring | cut -d"|" -f3 )
+
+	if [ "$DEBUG" = "1" ]
+	then
+		length=${#TXURL}
+		echo "\$TXURL is $length long"
+		echo "upload-string: $TXURL"
+		echo "update returnstring: $returnstring"
+	fi
+
+	if [ ! "$errorcode" = "0" ] 
+	then
+		echo "Map Server returned error"
+		echo 
+		echo "Error Code: $errorcode"
+		echo 
+		echo "Error Text: $errormessage"
+		echo 
+		echo "Transmit String: $TXURL"
+		echo
+		UPLOAD_SUCCESSFUL=0
+	fi
+}
+
+upload(){
+	[ "$DEBUG" = "1" ] &&	echo "entered upload()"
+  
+	rem_trailing_comma
+	if [ -n "$1" ]
+	then
+		TXURL="$1"
+	else
+		TXURL="$URL$UPLOADPREFIX$DATA$UPLOADAPPENDIX"
+	fi
+
+	if [ "$PRETEND_UPLOAD" = "1" ]
+	then
+		echo "This would have been transmitted without '-p':"
+		echo "$TXURL"
+	else
+		upload_error "$( wget -T30 -q -O- $TXURL )"
+	fi
+
+	DATA=""
+	TXURL=""
+}
+
+upload_split_check(){
+	length=${#DATA}
+	if [ $length -gt 1500 ]
+	then
+		upload
+		DATA=""
+	fi
+}
+
+
+
+getid(){
+	eval $( ip addr | awk '
+	{
+		if($0~/ether/){
+			ether=$2 }
+		if($0~/inet /){
+		  split($2,tmp,"/")
+		  ip=tmp[1]
+		  if(ether){
+				print "macaddr="ether";ip="ip
+				exit
+			}
+		}
+	}' )
+
+	[ "$GETIDIP" = "1" ] && ip_addon="&ipv4Addr=$ip"
+	
+	upload "$URL?do=getID&macAddr=$macaddr$ip_addon"
+
+	eval "$returndata"
+
+	saveid
+}
+
+
+update(){
+	[ "$DEBUG" = "1" ] &&	echo "entered update() $1"
+	do="$1"
+
+	load_node_data
+	if [ "$nodeid" = "0" -o -z "$nodeid" ] 
+	then
+		[ "$QUIET" = "0" ] && echo "Error while getting ID. NodeID is 0 or empty. Retrieving a new one"
+		getid
+		do="full"
+	fi
+
+	UPLOADPREFIX="?do=update&node="
+	obj -v UPLOADPREFIX
+		attr -v UPLOADPREFIX id $nodeid
+	
+	endobj -v UPLOADAPPENDIX
+	rem_trailing_comma -v UPLOADAPPENDIX
+	
+	case $1 in
+		link)
+			rp_links
+			upload
+			rf_links
+			upload
+			;;
+		* )	
+			load_node_data	
+			attr updateIntervalNode $nodeinterval
+			attr updateIntervalLink $linkinterval
+			attr timeout $timeout
+			attr hostname $( uname -n )
+			[ -n "$lat" ] && attr latitude $lat
+			[ -n "$lon" ] && attr longitude $lon
+			upload
+		
+			network_interfaces
+			upload
+
+			rp_links
+			upload
+
+			rf_links
+			upload
+			;;
+	esac
+
+	[ "$UPLOAD_SUCCESSFUL" = "1" ] && 
+		[ "$QUIET" = "0" ] && 
+			[ "$PRETEND_UPLOAD" = "0" ] && 
+				echo "Update successful. Server reported no errors."
+}
+
+
+start(){
+	create_config
+	add_to_cron		
+}
+
+stop (){
+	grep -v yaffmap /etc/crontabs/root > /tmp/yaffmap.tmp
+	mv /tmp/yaffmap.tmp /etc/crontabs/root
+}
+
+
+args=$@
+
+for s in $@
+do
+	case $s in
+		"-q") 
+			QUIET=1
+			;;
+		"-v")	
+			DEBUG=1
+			;;
+		"--getidip")
+			GETIDIP=1
+			;;
+		"-p")
+			PRETEND_UPLOAD=1
+			;;
+	esac
+	args=$( echo $args | sed 's/$s//g' )	
+done
+
+case $( echo $args | cut -d" " -f1 ) in
+	start|stop) $1
+		;;
+	update) update $2
+		;;
+	global)	olsr_global_update
+		;;
+	restart)	stop
+						start
+		;;
+	*)	
+			echo "usage: $0 [options] start|stop|update"
+			echo "	options:"
+			echo "	-v		show debug output"
+			echo "	-q		do not show show success or error messages"
+			echo "	-p		pretend upload"
+			echo "	--getidip	use also IP address to retrieve nodeID from map server"
+esac
+	

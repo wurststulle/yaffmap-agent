@@ -1,0 +1,52 @@
+app(){
+  eval "$1=\"\$$1$2\""
+}
+
+rem_trailing_comma(){
+	if [ -z "$1" ]
+	then
+		DATA=$( echo $DATA | sed s/.$// )
+	else
+		[ "$1" = "-v" ] && eval "$2=\$( echo \$$2 | sed s/\.\$// )"
+	fi
+}
+
+json_helper(){
+	local tail var
+	do="$1"
+	shift
+	
+  if [ "$1" = "-v" ]
+  then
+  	var=$2
+  	rtc=$2
+  	arg=$1
+  	shift;shift
+  else
+    var="DATA"
+  fi
+
+		case $do in
+      "obj")		[ -n "$1" ] && app $var "\\\"$1\\\":"
+								app $var "{"
+      					;;
+			"endobj")	rem_trailing_comma $arg $rtc
+								app $var "},"
+								;;
+			"array")	
+								[ -n "$1" ] && app $var "\\\"$1\\\":"
+								app $var "["
+								;;
+			"endarr")	rem_trailing_comma $arg $rtc
+								app $var "],"
+      					;;
+      "attr")		
+      					app $var "\\\"$1\\\":\\\"$2\\\","
+      					;;
+    esac
+}
+
+for s in obj endobj array endarr attr
+do
+	eval "alias $s=\"json_helper $s\""
+done

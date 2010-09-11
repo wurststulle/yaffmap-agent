@@ -1,0 +1,115 @@
+	olsr_links(){
+		[ "$DEBUG" = "1" ] &&	echo "entered olsr_links()"
+		olsr_config=$1
+		obj olsr
+			attr metric $( grep LinkQualityAlgorithm $olsr_config | cut -d" " -f2 | sed 's/"//g' ) 
+			ipversion=$( grep IpVersion $olsr_config | cut -d" " -f2 )
+			attr ipv $ipversion 
+	    
+			case "$ipversion" in
+				"4" ) exec<<EOM
+		    $( wget -T30 -q -O- http://127.0.0.1:2006/links | grep -e ^[1-9] )
+EOM
+						;;
+				"6" ) exec<<EOM
+	    	$( wget -T30 -q -O- http://[::1]:2006/links | grep -e ^[1-9] )
+EOM
+						;;
+			esac
+		
+			array link        
+			while read my_ip n_ip lq nlq etx 
+			do
+				if [ -n "$n_ip" -a "$etx" != "INFINITE" ]; then
+					obj
+						attr sourceAddr $my_ip
+						attr destAddr $n_ip	
+						attr rx $lq
+						attr tx $nlq
+						attr cost $etx
+					endobj
+				fi
+			done 
+			endarr 
+		endobj
+	}
+
+olsr_global_update(){
+
+	UPLOADPREFIX="?do=globalUpdate&node="
+#	obj -v UPLOADPREFIX
+	array -v UPLOADPREFIX #node
+	endarr -v UPLOADAPPENDIX
+#	endobj -v UPLOADAPPENDIX
+	rem_trailing_comma -v UPLOADAPPENDIX
+
+	get_dnssuffix(){
+		config_get suffix "$1" suffix
+	}
+	
+	config_load olsrd
+	config_foreach get_dnssuffix LoadPlugin
+	
+	cp /var/etc/hosts.olsr $TEMP_DIR
+	cp /var/run/latlon.js $TEMP_DIR
+	
+	cat <<EOF > $TEMP_DIR/latlon_crawler.awk
+#!/usr/bin/awk -f
+BEGIN{
+EOF
+
+	chmod 755 $TEMP_DIR/latlon_crawler.awk
+
+	awk '
+	{
+	if ($2!~/^mid[1-9]\./)
+		if ($1~/^[1-9]/) 
+			if ($1!~/127\.0\.0\./) {
+				print "	hosts_names[\""$2","$1"\"]" 
+			}
+	}
+	' $TEMP_DIR/hosts.olsr >> $TEMP_DIR/latlon_crawler.awk
+
+
+
+	cat <<EOM >> $TEMP_DIR/latlon_crawler.awk
+	}
+	{
+		gsub(");","")
+		gsub(","," ")
+		gsub("'","")
+	
+		if ( \$1~/^Mid/ ) {
+			gsub("Mid(","")
+			mid[\$1]=mid[\$1]"obj;attr ipv4Addr "\$2";endobj;"
+		}
+		if  (\$1~/^Node/ ) {
+			gsub("Node(","")
+			print "obj;attr name "\$6";attr latitude "\$2";attr longitude "\$3";array iface;"
+			print "obj;attr ipv4addr "\$1";endobj;"mid[\$1]"endarr;endobj;upload_split_check;"
+			delete mid[\$1]
+			hostplussuffix=\$6"$suffix"
+			for ( s in hosts_names ) {
+				split( s, separate, "," )
+				if ( separate[1] == hostplussuffix )
+					delete hosts_names[s]
+			}
+	}
+	}
+	END{
+		for ( s in hosts_names ) {
+			split( s, separate, "," )
+			print "obj;attr name "separate[1]";array iface;obj;attr ipv4addr "separate[2]";endobj;"mid[separate[2]]"endarr;endobj;upload_split_check;"
+			delete mid[separate[2]]
+		}
+		for ( m in mid ){
+			print "obj;array iface;obj;attr ipv4addr "m";endobj;"mid[m]"endarr;endobj;upload_split_check;"
+			}
+	}
+EOM
+
+	eval "$( $TEMP_DIR/latlon_crawler.awk $TEMP_DIR/latlon.js )"
+	upload
+	rm $TEMP_DIR/latlon_crawler.awk $TEMP_DIR/latlon.js $TEMP_DIR/hosts.olsr
+}
+
