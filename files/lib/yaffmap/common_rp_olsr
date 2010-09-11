@@ -1,3 +1,4 @@
+#!/bin/sh
 ROUTINGPROTOCOLS="$ROUTINGPROTOCOLS olsr"
 
 olsr_links_common(){
@@ -41,7 +42,7 @@ olsr_global_update_common(){
 	updateintervalglobal=$1
 
 	UPLOADPREFIX="?do=globalUpdate"
- 	[ -n "$updateintervalglobal$ ] && UPLOADPREFIX="$UPLOADPREFIX&updateIntervalGlobal=$updateintervalglobal"
+ 	[ -n "$updateintervalglobal" ] && UPLOADPREFIX="$UPLOADPREFIX&updateIntervalGlobal=$updateintervalglobal"
 	UPLOADPREFIX="$UPLOADPREFIX&node="
 	UPLOADSUFFIX=""
 	array -v UPLOADPREFIX #node
