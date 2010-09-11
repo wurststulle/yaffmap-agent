@@ -41,13 +41,16 @@ olsr_global_update_common(){
 
 	updateintervalglobal=$1
 
-	UPLOADPREFIX="?do=globalUpdate"
- 	[ -n "$updateintervalglobal" ] && UPLOADPREFIX="$UPLOADPREFIX&updateIntervalGlobal=$updateintervalglobal"
+	UPLOADPREFIXLOCAL="?do=globalUpdate"
+
+	UPLOADPREFIX=""
+ 	[ -n "$updateintervalglobal" ] && UPLOADPREFIX="$UPLOADPREFIXLOCAL&updateIntervalGlobal=$updateintervalglobal"
 	UPLOADPREFIX="$UPLOADPREFIX&node="
+	array -v UPLOADPREFIX
 	UPLOADSUFFIX=""
-	array -v UPLOADPREFIX #node
 	endarr -v UPLOADSUFFIX
 	rem_trailing_comma -v UPLOADSUFFIX
+
 
 	get_dnssuffix(){
 		config_get suffix "$1" suffix
@@ -100,7 +103,12 @@ EOF
 				if ( separate[1] == hostplussuffix )
 					delete hosts_names[s]
 			}
-	}
+		}
+		if  (\$1~/Link/ ) {
+		gsub("PLink(","")
+		gsub("Link(","")
+		link[\$2";"\$1";"\$3";"\$4";"\$5]
+		}
 	}
 	END{
 		for ( s in hosts_names ) {
@@ -108,9 +116,19 @@ EOF
 			print "obj;attr name "separate[1]";array iface;obj;attr ipv4Addr "separate[2]";endobj;"mid[separate[2]]"endarr;endobj;upload_split_check;"
 			delete mid[separate[2]]
 		}
+
 		for ( m in mid ){
 			print "obj;array iface;obj;attr ipv4Addr "m";endobj;"mid[m]"endarr;endobj;upload_split_check;"
 			}
+
+		print "UPLOADPREFIX=\"\""
+		print "UPLOADPREFIX=\"\$UPLOADPREFIXLOCAL&link=\""
+		print "array -v UPLOADPREFIX"
+
+		for ( l in link ){
+			split(l,line,";")
+			print "obj;attr sAddr "line[1]";attr dAddr "line[2]";attr rx "line[3]";attr tx "line[4]";attr cost "line[5]";endobj;upload_split_check;"
+		}
 	}
 EOM
 
