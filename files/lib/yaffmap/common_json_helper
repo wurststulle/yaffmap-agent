@@ -5,9 +5,9 @@ app(){
 rem_trailing_comma(){
 	if [ -z "$1" ]
 	then
-		DATA=$( echo $DATA | sed s/.$// )
+		DATA=$( echo $DATA | sed s/,$// )
 	else
-		[ "$1" = "-v" ] && eval "$2=\$( echo \$$2 | sed s/\.\$// )"
+		[ "$1" = "-v" ] && eval "$2=\$( echo \$$2 | sed s/\,\$// )"
 	fi
 }
 
