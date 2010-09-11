@@ -1,0 +1,296 @@
+#!/bin/sh
+
+#
+# functions in this file called by init-script:
+# network_interfaces (uploads wired and wireless interfaces config by itself)
+# rf_links (uploads wireless intefaces config by itself)
+# create_config (creates the initial in config memory)
+# add_to_cron (creates cron_entries)
+# saveid (saves the nodeid)
+# load_node_data 
+#
+
+config_get_batch(){
+	for s in $*
+	do
+		eval "config_get $s \"$1\" $s"
+	done
+}
+
+make_dev_list(){
+	DEVICES="$DEVICES $1"
+}
+
+
+create_config(){
+	if [ ! -e /etc/config/freifunk_map ]
+	then
+		[ "$DEBUG" = "1" ] &&	echo "No config-file. Creating new one"
+		cat <<EOF > /etc/config/freifunk_map
+	
+config 'node' 'ffmap'
+	option	'id' '0'
+	option	'nodeinterval' '1'
+	option	'linkinterval' '0.1'
+	option	'timeout' '5'
+
+EOF
+	fi
+}
+
+add_to_cron(){
+	config_load freifunk_map
+	config_get_batch ffmap nodeinterval linkinterval
+	minutes=$(date | cut -d":" -f2)
+	
+	for s in node link
+	do
+		eval "int=\$${s}interval"
+		dez=$( echo $int | cut -d"." -f1 )
+		fract=$( echo $int | cut -d"." -f2 )
+	
+		if [ -z "$( grep yaffmap /etc/crontabs/root | grep $s )" ]
+		then
+			if [ "$dez" = "0" ]
+			then
+				fract=${fract:0:1}
+				minstep=$( expr 60 \* $fract / 10 )
+				echo "*/$minstep * * * * /etc/init.d/yaffmap update $s" >> /etc/crontabs/root
+			else
+				echo "$minutes */$dez * * * /etc/init.d/yaffmap update $s" >> /etc/crontabs/root
+			fi
+		fi
+	done
+
+}
+
+saveid(){
+	uci set freifunk_map.ffmap.id="$1"
+	uci commit
+}
+
+load_node_data(){
+	config_load freifunk_map
+	config_get_batch ffmap nodeinterval linkinterval timeout id
+	config_load olsrd
+	get_gps_coords(){
+		local config=$1
+		config_get lat $config lat 2>/dev/null
+		config_get lon $config lon 2>/dev/null
+	}
+	config_foreach get_gps_coords LoadPlugin
+}
+
+
+wifi_default_config(){
+	cat <<EOF >> /etc/config/freifunk_map
+
+config rf-iface $config
+	option	'antDirection'	'0'
+	option	'antGain'	'2'
+	option	'antBeamH'	'360'
+	option	'antBeamV'	'90'
+	option	'antPol'	'V'
+	option	'antTilt'	'0'
+	option	'ignore'	'0'
+
+EOF
+}
+
+wired_default_config(){
+	local config=$1
+	
+	cat <<EOF >> /etc/config/freifunk_map
+
+config wired-iface $config
+	option	'ignore'	'0'
+
+EOF
+	[ "$config" = "loopback" ] && uci set freifunk_map.$config.ignore=1
+}
+
+interface_addresses(){
+	[ "$DEBUG" = "1" ] &&	echo "entered interface_addresses() $1"
+	ip_params(){		
+		local config=$1
+		config_get_batch "$config" ipaddr ip6addr
+		[ -n "$ipaddr" ] && attr ipv4Addr $ipaddr
+		[ -n "$ip6addr" ] && attr ipv6Addr $ip6Addr
+	}
+
+	local config=$1
+	config_get_batch "$config" ifname type aliases
+	macaddr=$( ip addr show dev $ifname | grep -e '.*:.*:.*:.*:.*:.*' | cut -d" " -f 6 )
+	attr macAddr $macaddr
+	ip_params $config
+	[ "$type" = "bridge" ] && attr bridgeName "$ifname"
+
+	[ -n "$aliases" ] && {
+		array ipAlias
+			for a in $aliases
+			do
+				obj
+					config_get ifname "$a" ifname
+					attr name $ifname
+					ip_params $a
+				endobj
+			done
+		endarr
+	}
+}
+
+
+wifi_device_attributes(){
+	[ "$DEBUG" = "1" ] &&	echo "entered wifi_device_attributes() $1"
+	
+	wifi_iface_attributes(){
+		[ "$DEBUG" = "1" ] &&echo "entered wifi_iface_attributes() $1"
+		local config="$1"
+	
+		config_get device "$config" device
+		if [ "$device" = "$2" ]
+		then
+			config_get_batch "$config" ssid bssid mode ifname
+			obj
+				[ -n "$ssid" ] && attr essid $ssid
+				[ -n "$bssid" ] && attr bssid $bssid
+				[ -n "$mode" ] && attr wlMode $mode
+				config_get network "$config" network
+				config_get ifname "$config" ifname
+				attr name $ifname
+				wlmac=$( ip addr show dev $ifname | grep -e '.*:.*:.*:.*:.*:.*' | cut -d" " -f 6 )
+				attr wlMacAddr $wlmac
+				interface_addresses $network
+				config_get type "$network" type
+				[ "$type" != "bridge" ] && WIRELESS_NETWORKS="$WIRELESS_NETWORKS $network"
+			endobj
+		fi
+	} 
+
+	local config="$1"
+	
+	[ -z "$(uci get freifunk_map.$config.ignore 2>/dev/null )" ] && wifi_default_config	$config
+	
+	ignore=$(uci get freifunk_map.$config.ignore)
+	
+	if [ "$ignore" != "1" ]
+	then
+		config_get_batch "$config" type channel hwmode txpower macaddr antDirection antGain antBeamH antBeamV antPol antTilt macaddr
+		obj
+			attr name $config
+			
+			for s in antDirection antGain antBeamH antBeamV antPol antTilt channel txpower
+			do
+				eval "var_cont=\$$s"
+				[ -n "$var_cont" ] && attr $s $var_cont
+			done
+			[ -n "$hwmode" ] && attr wirelessStandard "802.$hwmode"
+			
+			array wlIface
+				config_foreach wifi_iface_attributes wifi-iface $config
+			endarr
+		endobj
+	fi
+}
+
+network_interfaces(){
+	[ "$DEBUG" = "1" ] &&	echo "entered network_interfaces()"
+	
+	network_iface(){
+		[ "$DEBUG" = "1" ] &&	echo "entered network_iface() $1"
+		local config=$1
+		local isbridge=0
+		local iswireless=0
+		
+		for net in $WIRELESS_NETWORKS
+		do
+			[ "$net" = "$config" ] && iswireless=1
+		done
+		
+		if [ "$iswireless" != "1" ]
+		then
+			[ -z "$(uci get freifunk_map.$config.ignore 2>/dev/null )" ] && wired_default_config $config
+	
+			ignore=$(uci get freifunk_map.$config.ignore)
+		
+			if [ "$ignore" != "1" ]
+			then
+				obj
+					config_get ifname "$config" ifname
+					attr name $ifname
+					interface_addresses $config
+				endobj
+			fi
+		fi
+	}
+	
+
+	config_load network
+	scan_interfaces
+
+	array wlDevice
+		config_load wireless
+		config_foreach make_dev_list wifi-device
+		for wd in $DEVICES
+		do
+			wifi_device_attributes $wd
+		done
+	endarr
+
+	array wiredIface
+		config_load network
+		DEVICES=""
+		config_foreach make_dev_list interface
+		for int in $DEVICES
+		do
+			network_iface $int
+		done
+	endarr
+}
+
+rf_links(){
+	[ "$DEBUG" = "1" ] &&	echo "entered rf_links()"
+
+	rflinks_wifi_iface(){
+		[ "$DEBUG" = "1" ] &&	echo "entered rflinks_wifi_iface() $1"
+
+		local config=$1
+		config_get device "$config" device
+		
+		if [ "$device" = "$2" ]
+		then
+			config_get ifname $config ifname
+			macaddr=$( ip addr show dev $ifname | grep -e '.*:.*:.*:.*:.*:.*' | cut -d" " -f 6 )
+			case $3 in
+				atheros)	temp=$( wlanconfig $ifname list sta | grep -v ADDR | grep -i -v $macaddr | awk -v source=$macaddr '{print "obj; attr sMac "source"; attr dMac "$1"; attr rssi "$6"; endobj"}' )
+									eval "$temp"
+					;;
+				mac80211)	temp=$(iw $ifname station dump | awk -v source=$macaddr '{
+										if($1~/Station/) print "obj;attr sMac "source";attr dMac "$2";";
+										if($1~/signal/) print "attr rssi "$2";";
+										if($0~/tx bitrate/) print "attr txrate "$3";endobj;"}' )
+									eval "$temp"
+					;;
+			esac
+		fi
+	}
+
+	rflinks_wifi_device(){
+		[ "$DEBUG" = "1" ] &&	echo "entered rflinks_wifi_device() $1"
+
+		local config=$1
+		config_get type "$config" type
+		config_foreach rflinks_wifi_iface wifi-iface "$config" $type
+	}
+	
+	DEVICES=""
+	array rfNeighbour
+		config_load wireless
+		config_foreach make_dev_list wifi-device
+		for wd in $DEVICES
+		do
+			rflinks_wifi_device $wd
+		done
+	endarr
+}
+

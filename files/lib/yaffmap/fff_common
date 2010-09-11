@@ -1,0 +1,36 @@
+#!/bin/sh
+
+#
+# functions in this file called by init-script:
+# network_interfaces (uploads wired and wireless interfaces config by itself)
+# rf_links (uploads wireless intefaces config by itself)
+# create_config (creates the initial in config memory)
+# add_to_cron (creates cron_entries)
+# saveid (saves the nodeid)
+# load_node_data 
+#
+
+create_config(){
+	echo "create_config()"
+}
+
+add_to_cron(){
+	echo "add_to_cron()"
+}
+
+saveid(){
+	echo "saveid()"
+}
+
+load_node_data(){
+	echo "load_node_data()"
+}
+
+network_interfaces(){
+	echo "network_interfaces()"
+}
+
+rf_links(){
+	echo "rf_links()"
+}
+
