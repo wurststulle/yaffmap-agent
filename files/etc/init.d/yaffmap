@@ -14,20 +14,11 @@ DEBUG=0
 QUIET=0
 TEMP_DIR=/tmp
 
-. /lib/yaffmap/json_helper
+for file in $( ls /lib/yaffmap/* )
+do
+	. $file
+done
 
-. /lib/yaffmap/uci_common
-
-. /lib/yaffmap/rp_olsr_common
-
-rp_links(){
-	obj neighbour
-	  for config in /var/etc/olsrd.conf /var/etc/olsrd-ipv6.conf
-  	do
-    	[ -e $config ] && olsr_links $config
-	  done
-	endobj
-}
 
 upload_error(){
 	local returnstring="$1"
@@ -90,6 +81,14 @@ upload_split_check(){
 	fi
 }
 
+rp_links(){
+	obj neighbour
+		for rp in $ROUTINGPROTOCOLS
+		do
+			${rp}_links
+		done
+	endobj
+}
 
 
 getid(){
@@ -113,7 +112,7 @@ getid(){
 
 	eval "$returndata"
 
-	saveid
+	saveid "$id"
 }
 
 
@@ -122,7 +121,7 @@ update(){
 	do="$1"
 
 	load_node_data
-	if [ "$nodeid" = "0" -o -z "$nodeid" ] 
+	if [ "$id" = "0" -o -z "$id" ] 
 	then
 		[ "$QUIET" = "0" ] && echo "Error while getting ID. NodeID is 0 or empty. Retrieving a new one"
 		getid
@@ -131,12 +130,12 @@ update(){
 
 	UPLOADPREFIX="?do=update&node="
 	obj -v UPLOADPREFIX
-		attr -v UPLOADPREFIX id $nodeid
+		attr -v UPLOADPREFIX id $id
 	
 	endobj -v UPLOADAPPENDIX
 	rem_trailing_comma -v UPLOADAPPENDIX
 	
-	case $1 in
+	case $do in
 		link)
 			rp_links
 			upload
@@ -218,7 +217,7 @@ case $( echo $args | cut -d" " -f1 ) in
 			echo "	options:"
 			echo "	-v		show debug output"
 			echo "	-q		do not show show success or error messages"
-			echo "	-p		pretend upload"
+			echo "	-p		data is printed on screen instead of being uploaded"
 			echo "	--getidip	use also IP address to retrieve nodeID from map server"
 esac
 	

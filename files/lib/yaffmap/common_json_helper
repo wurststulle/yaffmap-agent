@@ -19,7 +19,6 @@ json_helper(){
   if [ "$1" = "-v" ]
   then
   	var=$2
-  	rtc=$2
   	arg=$1
   	shift;shift
   else
@@ -30,14 +29,14 @@ json_helper(){
       "obj")		[ -n "$1" ] && app $var "\\\"$1\\\":"
 								app $var "{"
       					;;
-			"endobj")	rem_trailing_comma $arg $rtc
+			"endobj")	rem_trailing_comma $arg $var
 								app $var "},"
 								;;
 			"array")	
 								[ -n "$1" ] && app $var "\\\"$1\\\":"
 								app $var "["
 								;;
-			"endarr")	rem_trailing_comma $arg $rtc
+			"endarr")	rem_trailing_comma $arg $var
 								app $var "],"
       					;;
       "attr")		
