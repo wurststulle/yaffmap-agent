@@ -36,9 +36,13 @@ EOM
 	endobj
 }
 
-olsr_global_update(){
+olsr_global_update_common(){
 
-	UPLOADPREFIX="?do=globalUpdate&node="
+	updateintervalglobal=$1
+
+	UPLOADPREFIX="?do=globalUpdate"
+ 	[ -n "$updateintervalglobal$ ] && UPLOADPREFIX="$UPLOADPREFIX&updateIntervalGlobal=$updateintervalglobal"
+	UPLOADPREFIX="$UPLOADPREFIX&node="
 	UPLOADSUFFIX=""
 	array -v UPLOADPREFIX #node
 	endarr -v UPLOADSUFFIX
