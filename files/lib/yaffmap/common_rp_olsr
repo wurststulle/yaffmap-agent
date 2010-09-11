@@ -87,7 +87,7 @@ EOF
 		if  (\$1~/^Node/ ) {
 			gsub("Node(","")
 			print "obj;attr name "\$6";attr latitude "\$2";attr longitude "\$3";array iface;"
-			print "obj;attr ipv4addr "\$1";endobj;"mid[\$1]"endarr;endobj;upload_split_check;"
+			print "obj;attr ipv4Addr "\$1";endobj;"mid[\$1]"endarr;endobj;upload_split_check;"
 			delete mid[\$1]
 			hostplussuffix=\$6"$suffix"
 			for ( s in hosts_names ) {
@@ -100,11 +100,11 @@ EOF
 	END{
 		for ( s in hosts_names ) {
 			split( s, separate, "," )
-			print "obj;attr name "separate[1]";array iface;obj;attr ipv4addr "separate[2]";endobj;"mid[separate[2]]"endarr;endobj;upload_split_check;"
+			print "obj;attr name "separate[1]";array iface;obj;attr ipv4Addr "separate[2]";endobj;"mid[separate[2]]"endarr;endobj;upload_split_check;"
 			delete mid[separate[2]]
 		}
 		for ( m in mid ){
-			print "obj;array iface;obj;attr ipv4addr "m";endobj;"mid[m]"endarr;endobj;upload_split_check;"
+			print "obj;array iface;obj;attr ipv4Addr "m";endobj;"mid[m]"endarr;endobj;upload_split_check;"
 			}
 	}
 EOM
