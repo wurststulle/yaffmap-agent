@@ -57,7 +57,7 @@ upload(){
 	then
 		TXURL="$1"
 	else
-		TXURL="$URL$UPLOADPREFIX$DATA$UPLOADAPPENDIX"
+		TXURL="$URL$UPLOADPREFIX$DATA$UPLOADSUFFIX"
 	fi
 
 	if [ "$PRETEND_UPLOAD" = "1" ]
@@ -132,10 +132,9 @@ update(){
 	obj -v UPLOADPREFIX
 		attr -v UPLOADPREFIX id $id
 	
-	endobj -v UPLOADAPPENDIX
-	rem_trailing_comma -v UPLOADAPPENDIX
+	endobj -v UPLOADSUFFIX
+	rem_trailing_comma -v UPLOADSUFFIX
 	
-	echo "do: $update_mode"
 	case $update_mode in
 		link)
 			rp_links

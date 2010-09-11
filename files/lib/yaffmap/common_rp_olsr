@@ -39,11 +39,10 @@ EOM
 olsr_global_update(){
 
 	UPLOADPREFIX="?do=globalUpdate&node="
-#	obj -v UPLOADPREFIX
+	UPLOADSUFFIX=""
 	array -v UPLOADPREFIX #node
-	endarr -v UPLOADAPPENDIX
-#	endobj -v UPLOADAPPENDIX
-	rem_trailing_comma -v UPLOADAPPENDIX
+	endarr -v UPLOADSUFFIX
+	rem_trailing_comma -v UPLOADSUFFIX
 
 	get_dnssuffix(){
 		config_get suffix "$1" suffix
