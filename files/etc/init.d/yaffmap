@@ -118,14 +118,14 @@ getid(){
 
 update(){
 	[ "$DEBUG" = "1" ] &&	echo "entered update() $1"
-	do="$1"
+	update_mode="$1"
 
 	load_node_data
 	if [ "$id" = "0" -o -z "$id" ] 
 	then
 		[ "$QUIET" = "0" ] && echo "Error while getting ID. NodeID is 0 or empty. Retrieving a new one"
 		getid
-		do="full"
+		update_mode="full"
 	fi
 
 	UPLOADPREFIX="?do=update&node="
@@ -135,7 +135,8 @@ update(){
 	endobj -v UPLOADAPPENDIX
 	rem_trailing_comma -v UPLOADAPPENDIX
 	
-	case $do in
+	echo "do: $update_mode"
+	case $update_mode in
 		link)
 			rp_links
 			upload
