@@ -53,6 +53,8 @@ olsr_global_update_common(){
 
 	local updateintervalglobal=$1
 	local suffix=$2
+	local metrictype=$3
+	local ipversion=$4
 	local UPLOADPREFIXLOCAL
 	local error=0
 
@@ -128,21 +130,34 @@ EOF
 		for ( m in mid ){
 			print "obj;array iface;obj;attr ipv4Addr "m";endobj;"mid[m]"endarr;endobj;upload_split_check;"
 			}
-
+		
+		print "upload"
 		print "UPLOADPREFIX=\"\""
 		print "UPLOADPREFIX=\"\$UPLOADPREFIXLOCAL&link=\""
-		print "array -v UPLOADPREFIX"
+		print "obj -v UPLOADPREFIX"
+		print "attr -v UPLOADPREFIX rp olsr"
+		print "attr -v UPLOADPREFIX metricType $metrictype"
+		print "attr -v UPLOADPREFIX ipv $ipversion"
+		print "array -v UPLOADPREFIX link"
+		print "UPLOADSUFFIX=\"\""
+		print "endarr -v UPLOADSUFFIX"
+		print "endobj -v UPLOADSUFFIX"
+		print "rem_trailing_comma -v UPLOADSUFFIX"
 
+		lc=0
 		for ( l in link ){
 			split(l,line,";")
 			print "obj;attr sAddr "line[1]";attr dAddr "line[2]";attr rx "line[3]";attr tx "line[4]";attr cost "line[5]";endobj;upload_split_check;"
+			++lc
 		}
+		print "echo \"links uploaded: "lc"\""
 	}
 EOM
 
 	eval "$( $TEMP_DIR/latlon_crawler.awk $TEMP_DIR/latlon.js )"
 	upload
-	[ $UPLOADSPLITCHECKERROR -eq 1 ] && error=1 || error=$?
+	error=$?
+	[ "$UPLOADSPLITCHECKERROR" -eq 1 ] && error=1 
 	rm $TEMP_DIR/latlon_crawler.awk $TEMP_DIR/latlon.js $TEMP_DIR/hosts.olsr
 	
 	[ "$DEBUG" = "1" ] && echo "exiting olsr_global_update_common() $error"

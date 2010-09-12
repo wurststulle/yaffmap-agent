@@ -50,6 +50,7 @@ upload(){
 			length=${#txurl}
 			echo "\$TXURL is $length long"
 			echo "upload-string: $txurl"
+			echo "error text: $errormessage"
 			echo "update returnstring: $SERVER_RESPONSE"
 		fi
 
@@ -176,7 +177,7 @@ update(){
 		* )	
 			load_node_data	
 			attr updateIntervalNode $nodeinterval
-			attr updateIntervalLink $linkinterval
+			attr updateIntervalLink $linksinterval
 			attr timeout $timeout
 			attr hostname $( uname -n )
 			[ -n "$lat" ] && attr latitude $lat
