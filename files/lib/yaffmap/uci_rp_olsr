@@ -22,7 +22,7 @@ olsr_global_update(){
 	local suffix 
 	local updateintervalglobal
 
-	updateintervalglobal=$( uci get freifunk_map.ffmap.globalinterval )
+	updateintervalglobal=$( uci get freifunk_map.ffmap.globalinterval 2>/dev/null)
 
 	get_dnssuffix(){
 		config_get suffix "$1" suffix

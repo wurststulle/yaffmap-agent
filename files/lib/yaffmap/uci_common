@@ -6,6 +6,7 @@
 # rf_links (uploads wireless intefaces config by itself)
 # create_config (creates the initial in config memory)
 # add_to_cron (creates cron_entries)
+# remove_from_cron
 # saveid (saves the nodeid)
 # load_node_data 
 #
@@ -23,6 +24,17 @@ make_dev_list(){
 	DEVICES="$DEVICES $1"
 }
 
+migrate_from_old(){
+	local linkinterval
+	linkinterval=$(uci get freifunk_map.ffmap.linkinterval)
+	if [ -n "$linkinterval" ]
+	then
+		uci set freifunk_map.ffmap.linksinterval=$linkinterval
+		uci del freifunk_map.ffmap.linkinterval
+		remove_from_cron
+		add_to_cron
+	fi
+}
 
 create_config(){
 	if [ ! -e /etc/config/freifunk_map ]
@@ -33,7 +45,7 @@ create_config(){
 config 'node' 'ffmap'
 	option	'id' '0'
 	option	'nodeinterval' '1'
-	option	'linkinterval' '0.1'
+	option	'linksinterval' '0.1'
 	option	'timeout' '5'
 
 EOF
@@ -41,12 +53,12 @@ EOF
 }
 
 add_to_cron(){
-	local minutes nodeinterval linkinterval int s dez fract minstep
+	local minutes nodeinterval linksinterval int s dez fract minstep
 	config_load freifunk_map
-	config_get_batch ffmap nodeinterval linkinterval
+	config_get_batch ffmap nodeinterval linksinterval
 	minutes=$(date | cut -d":" -f2)
 	
-	for s in node link
+	for s in node links
 	do
 		eval "int=\$${s}interval"
 		dez=$( echo $int | cut -d"." -f1 )
@@ -64,7 +76,11 @@ add_to_cron(){
 			fi
 		fi
 	done
+}
 
+remove_from_cron(){
+	grep -v yaffmap /etc/crontabs/root > /tmp/yaffmap.tmp
+	mv /tmp/yaffmap.tmp /etc/crontabs/root
 }
 
 saveid(){
@@ -74,7 +90,7 @@ saveid(){
 
 load_node_data(){
 	config_load freifunk_map
-	config_get_batch ffmap nodeinterval linkinterval timeout id
+	config_get_batch ffmap nodeinterval linksinterval timeout id
 	config_load olsrd
 	get_gps_coords(){
 		local config=$1
@@ -275,13 +291,13 @@ rf_links(){
 			config_get ifname $config ifname
 			macaddr=$( ip addr show dev $ifname | grep -e '.*:.*:.*:.*:.*:.*' | cut -d" " -f 6 )
 			case $3 in
-				atheros)	temp=$( wlanconfig $ifname list sta | grep -v ADDR | grep -i -v $macaddr | awk -v source=$macaddr '{print "obj; attr sMac "source"; attr dMac "$1"; attr rssi "$6"; endobj"}' )
+				atheros)	temp=$( wlanconfig $ifname list sta | grep -v ADDR | grep -i -v $macaddr | awk -v source=$macaddr '{print "obj; attr sMac "source"; attr dMac "$1"; attr rssi "$6"; endobj;upload_split_check"}' )
 									eval "$temp"
 					;;
 				mac80211)	temp=$(iw $ifname station dump | awk -v source=$macaddr '{
 										if($1~/Station/) print "obj;attr sMac "source";attr dMac "$2";";
 										if($1~/signal/) print "attr rssi "$2";";
-										if($0~/tx bitrate/) print "attr txrate "$3";endobj;"}' )
+										if($0~/tx bitrate/) print "attr txrate "$3";endobj;upload_split_check;"}' )
 									eval "$temp"
 					;;
 			esac
@@ -296,19 +312,25 @@ rf_links(){
 		config_foreach rflinks_wifi_iface wifi-iface "$config" $type
 	}
 	
-	local error=0
+	local error=0 uploadprefixglobal uploadsuffixglobal
+	
+	uploadprefixglobal=$UPLOADPREFIX
+	array -v UPLOADPREFIX rfNeighbour
+	uploadsuffixglobal=$UPLOADSUFFIX
+	endarr -v UPLOADSUFFIX
 	
 	DEVICES=""
-	array rfNeighbour
-		config_load wireless
-		config_foreach make_dev_list wifi-device
-		for wd in $DEVICES
-		do
-			rflinks_wifi_device $wd
-		done
-	endarr
+	config_load wireless
+	config_foreach make_dev_list wifi-device
+	for wd in $DEVICES
+	do
+		rflinks_wifi_device $wd
+	done
 
 	upload
+	
+	UPLOADPREFIX=$uploadprefixglobal
+	UPLOADSUFFIX=$uploadsuffixglobal
 	
 	error=$?
 	[ "$DEBUG" = "1" ] && echo "exiting rf_links() $error"
