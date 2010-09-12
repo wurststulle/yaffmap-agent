@@ -40,32 +40,33 @@ upload(){
 	else
 		returnstring="$( wget -T30 -q -O- $txurl )"
 		error=$?
+
+		errorcode=$( echo $returnstring | cut -d"|" -f1 )
+		errormessage=$( echo $returnstring | cut -d"|" -f2 )
+		SERVER_RESPONSE=$( echo $returnstring | cut -d"|" -f3 )
+
+		if [ "$DEBUG" = "1" ]
+		then
+			length=${#txurl}
+			echo "\$TXURL is $length long"
+			echo "upload-string: $txurl"
+			echo "update returnstring: $SERVER_RESPONSE"
+		fi
+
+		if [ ! "$errorcode" = "0" ] 
+		then
+			echo "Map Server returned error"
+			echo 
+			echo "Error Code: $errorcode"
+			echo 
+			echo "Error Text: $errormessage"
+			echo 
+			echo "Transmit String: $txurl"
+			echo
+			error=1
+		fi
 	fi
 
-	errorcode=$( echo $returnstring | cut -d"|" -f1 )
-	errormessage=$( echo $returnstring | cut -d"|" -f2 )
-	SERVER_RESPONSE=$( echo $returnstring | cut -d"|" -f3 )
-
-	if [ "$DEBUG" = "1" ]
-	then
-		length=${#txurl}
-		echo "\$TXURL is $length long"
-		echo "upload-string: $txurl"
-		echo "update returnstring: $SERVER_RESPONSE"
-	fi
-
-	if [ ! "$errorcode" = "0" ] 
-	then
-		echo "Map Server returned error"
-		echo 
-		echo "Error Code: $errorcode"
-		echo 
-		echo "Error Text: $errormessage"
-		echo 
-		echo "Transmit String: $txurl"
-		echo
-		error=1
-	fi
 
 	DATA=""
 	
@@ -165,7 +166,7 @@ update(){
 	rem_trailing_comma -v UPLOADSUFFIX
 	
 	case $update_mode in
-		link)
+		links)
 			if ! rp_links; then error=1; fi
 			if ! rf_links; then error=1; fi
 			;;
@@ -216,12 +217,12 @@ done
 
 case $( echo $args | cut -d" " -f1 ) in
 	start)
+		migrate_from_old
 		if ! create_config; then error=1; fi
 		if ! add_to_cron; then error=1; fi
 		;;
 	stop)
-		grep -v yaffmap /etc/crontabs/root > /tmp/yaffmap.tmp
-		mv /tmp/yaffmap.tmp /etc/crontabs/root
+		remove_from_cron
 		;;
 	update) 
 		update $2
@@ -234,7 +235,7 @@ case $( echo $args | cut -d" " -f1 ) in
 		[ $? -eq 1 ] && error=1
 		;;
 	*)	
-			echo "usage: $0 [options] start|stop|update"
+			echo "usage: $0 [options] start|stop|(update [links|global])"
 			echo "	options:"
 			echo "	-v		show debug output"
 			echo "	-q		do not show show success or error messages"
