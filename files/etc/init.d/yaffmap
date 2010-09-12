@@ -153,7 +153,7 @@ update(){
 	load_node_data
 	if [ "$id" = "0" -o -z "$id" ] 
 	then
-		[ "$QUIET" = "0" ] && echo "Error while getting ID. NodeID is 0 or empty. Retrieving a new one"
+		[ "$QUIET" = "0" ] && echo "NodeID is 0 or empty. Retrieving a new one"
 		getid
 		update_mode="full"
 	fi
@@ -193,7 +193,7 @@ update(){
 	return $error
 }
 
-local error=0 usage=0
+local error=0 usage=0 noerrmsg=0
 args=$@
 
 for s in $@
@@ -217,12 +217,14 @@ done
 
 case $( echo $args | cut -d" " -f1 ) in
 	start)
-		migrate_from_old
 		if ! create_config; then error=1; fi
+		migrate_from_old
 		if ! add_to_cron; then error=1; fi
+		noerrmsg=1
 		;;
 	stop)
 		remove_from_cron
+		noerrmsg=1
 		;;
 	update) 
 		update $2
@@ -241,12 +243,12 @@ case $( echo $args | cut -d" " -f1 ) in
 			echo "	-q		do not show show success or error messages"
 			echo "	-p		data is printed on screen instead of being uploaded"
 			echo "	--getidip	use also IP address to retrieve nodeID from map server"
-			usage=1
+			noerrmsg=1
 		;;
 esac
 
 
-if [ $usage -eq 0 ]
+if [ $noerrmsg -eq 0 ]
 then
 	if [ $error -eq 0 ]
 	then

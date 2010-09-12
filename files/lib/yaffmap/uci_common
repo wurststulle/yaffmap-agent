@@ -26,7 +26,7 @@ make_dev_list(){
 
 migrate_from_old(){
 	local linkinterval
-	linkinterval=$(uci get freifunk_map.ffmap.linkinterval)
+	linkinterval=$(uci get freifunk_map.ffmap.linkinterval 2>/dev/null)
 	if [ -n "$linkinterval" ]
 	then
 		uci set freifunk_map.ffmap.linksinterval=$linkinterval
