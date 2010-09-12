@@ -20,19 +20,38 @@ do
 done
 
 
-upload_error(){
-	local returnstring="$1"
+upload(){
+	[ "$DEBUG" = "1" ] &&	echo "entered upload()"
 	
+	local error=0 returnstring errorcode errormessage error=0 txurl
+  
+	rem_trailing_comma
+	if [ -n "$1" ]
+	then
+		txurl="$1"
+	else
+		txurl="$URL$UPLOADPREFIX$DATA$UPLOADSUFFIX"
+	fi
+
+	if [ "$PRETEND_UPLOAD" = "1" ]
+	then
+		echo "This would have been transmitted without '-p':"
+		echo "$txurl"
+	else
+		returnstring="$( wget -T30 -q -O- $txurl )"
+		error=$?
+	fi
+
 	errorcode=$( echo $returnstring | cut -d"|" -f1 )
 	errormessage=$( echo $returnstring | cut -d"|" -f2 )
-	returndata=$( echo $returnstring | cut -d"|" -f3 )
+	SERVER_RESPONSE=$( echo $returnstring | cut -d"|" -f3 )
 
 	if [ "$DEBUG" = "1" ]
 	then
-		length=${#TXURL}
+		length=${#txurl}
 		echo "\$TXURL is $length long"
-		echo "upload-string: $TXURL"
-		echo "update returnstring: $returnstring"
+		echo "upload-string: $txurl"
+		echo "update returnstring: $SERVER_RESPONSE"
 	fi
 
 	if [ ! "$errorcode" = "0" ] 
@@ -43,55 +62,59 @@ upload_error(){
 		echo 
 		echo "Error Text: $errormessage"
 		echo 
-		echo "Transmit String: $TXURL"
+		echo "Transmit String: $txurl"
 		echo
-		UPLOAD_SUCCESSFUL=0
-	fi
-}
-
-upload(){
-	[ "$DEBUG" = "1" ] &&	echo "entered upload()"
-  
-	rem_trailing_comma
-	if [ -n "$1" ]
-	then
-		TXURL="$1"
-	else
-		TXURL="$URL$UPLOADPREFIX$DATA$UPLOADSUFFIX"
-	fi
-
-	if [ "$PRETEND_UPLOAD" = "1" ]
-	then
-		echo "This would have been transmitted without '-p':"
-		echo "$TXURL"
-	else
-		upload_error "$( wget -T30 -q -O- $TXURL )"
+		error=1
 	fi
 
 	DATA=""
-	TXURL=""
+	
+	[ "$DEBUG" = "1" ] && echo "exiting upload() $error"
+	return $error
 }
 
 upload_split_check(){
+#	[ "$DEBUG" = "1" ] && echo "entering upload_split_check()"
+	local error=0
+	
 	length=${#DATA}
 	if [ $length -gt 1500 ]
 	then
 		upload
+		error=$?
 		DATA=""
 	fi
+	
+	if [ "$UPLOADSPLITCHECKERROR" -eq 1 ] 
+	then
+		error=1
+	fi
+	UPLOADSPLITCHECKERROR=$error
+	
+#	[ "$DEBUG" = "1" ] && echo "exiting upload_split_check() $error"
+	return $error
 }
 
 rp_links(){
+	local error=0
+	
 	obj neighbour
 		for rp in $ROUTINGPROTOCOLS
 		do
-			${rp}_links
+			if ! ${rp}_links; then error=1; fi
 		done
 	endobj
+
+	upload
+	[ $error -eq 0 ] && error=$?
+
+	[ "$DEBUG" = "1" ] && echo "exiting rp_links() $error"	
+	return $error
 }
 
 
 getid(){
+	local error=0
 	eval $( ip addr | awk '
 	{
 		if($0~/ether/){
@@ -108,17 +131,23 @@ getid(){
 
 	[ "$GETIDIP" = "1" ] && ip_addon="&ipv4Addr=$ip"
 	
-	upload "$URL?do=getID&macAddr=$macaddr$ip_addon"
-
-	eval "$returndata"
-
-	saveid "$id"
+	if upload "$URL?do=getID&macAddr=$macaddr$ip_addon"
+	then
+		eval "$SERVER_RESPONSE"
+		saveid "$id"
+	else
+		error=1
+	fi
+	
+	[ "$DEBUG" = "1" ] && echo "exiting getid() $error"
+	return $error
 }
 
 
 update(){
 	[ "$DEBUG" = "1" ] &&	echo "entered update() $1"
-	update_mode="$1"
+	
+	local update_mode="$1" error=0
 
 	load_node_data
 	if [ "$id" = "0" -o -z "$id" ] 
@@ -137,12 +166,11 @@ update(){
 	
 	case $update_mode in
 		link)
-			rp_links
-			upload
-			rf_links
-			upload
+			if ! rp_links; then error=1; fi
+			if ! rf_links; then error=1; fi
 			;;
-		global)	olsr_global_update
+		global)	
+			if ! olsr_global_update ; then error=1; ERROR_REASON="$ERROR_REASON global_map_update"; fi
 			;;
 		* )	
 			load_node_data	
@@ -152,37 +180,19 @@ update(){
 			attr hostname $( uname -n )
 			[ -n "$lat" ] && attr latitude $lat
 			[ -n "$lon" ] && attr longitude $lon
-			upload
+			if ! upload; then error=1; ERROR_REASON="$ERROR_REASON node_data"; fi
 		
-			network_interfaces
-			upload
-
-			rp_links
-			upload
-
-			rf_links
-			upload
+			if ! network_interfaces; then error=1; ERROR_REASON="$ERROR_REASON interface_data"; fi
+			if ! rp_links; then error=1; ERROR_REASON="$ERROR_REASON rplink_data"; fi
+			if ! rf_links; then error=1; ERROR_REASON="$ERROR_REASON rflink_data"; fi
 			;;
 	esac
 
-	[ "$UPLOAD_SUCCESSFUL" = "1" ] && 
-		[ "$QUIET" = "0" ] && 
-			[ "$PRETEND_UPLOAD" = "0" ] && 
-				echo "Update successful. Server reported no errors."
+	[ "$DEBUG" = "1" ] && echo "exiting update() $error"
+	return $error
 }
 
-
-start(){
-	create_config
-	add_to_cron		
-}
-
-stop (){
-	grep -v yaffmap /etc/crontabs/root > /tmp/yaffmap.tmp
-	mv /tmp/yaffmap.tmp /etc/crontabs/root
-}
-
-
+local error=0 usage=0
 args=$@
 
 for s in $@
@@ -205,12 +215,23 @@ do
 done
 
 case $( echo $args | cut -d" " -f1 ) in
-	start|stop) $1
+	start)
+		if ! create_config; then error=1; fi
+		if ! add_to_cron; then error=1; fi
 		;;
-	update) update $2
+	stop)
+		grep -v yaffmap /etc/crontabs/root > /tmp/yaffmap.tmp
+		mv /tmp/yaffmap.tmp /etc/crontabs/root
 		;;
-	restart)	stop
-						start
+	update) 
+		update $2
+		error=$?
+		;;
+	restart)	
+		$0 stop
+		[ $? -eq 1 ] && error=1
+		$0 start
+		[ $? -eq 1 ] && error=1
 		;;
 	*)	
 			echo "usage: $0 [options] start|stop|update"
@@ -219,5 +240,18 @@ case $( echo $args | cut -d" " -f1 ) in
 			echo "	-q		do not show show success or error messages"
 			echo "	-p		data is printed on screen instead of being uploaded"
 			echo "	--getidip	use also IP address to retrieve nodeID from map server"
+			usage=1
+		;;
 esac
-	
+
+
+if [ $usage -eq 0 ]
+then
+	if [ $error -eq 0 ]
+	then
+		echo "Update Successful"
+	else
+		echo "Error during update. ERROR_REASON=$ERROR_REASON"
+		echo "Please start with argument -v and mail the output to the developers"
+	fi
+fi

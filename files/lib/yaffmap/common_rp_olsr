@@ -2,8 +2,11 @@
 ROUTINGPROTOCOLS="$ROUTINGPROTOCOLS olsr"
 
 olsr_links_common(){
-	[ "$DEBUG" = "1" ] &&	echo "entered olsr_links()"
-	olsr_config=$1
+	[ "$DEBUG" = "1" ] &&	echo "entered olsr_links_common()"
+
+	local olsr_config=$1 error=0
+	local metric ipversion my_ip n_ip lq nlq etx
+	
 	obj olsr
 		attr metric $( grep LinkQualityAlgorithm $olsr_config | cut -d" " -f2 | sed 's/"//g' ) 
 		ipversion=$( grep IpVersion $olsr_config | cut -d" " -f2 )
@@ -19,27 +22,40 @@ EOM
 EOM
 					;;
 		esac
-	
-		array link        
-		while read my_ip n_ip lq nlq etx 
-		do
-			if [ -n "$n_ip" -a "$etx" != "INFINITE" ]; then
-				obj
-					attr sourceAddr $my_ip
-					attr destAddr $n_ip	
-					attr rx $lq
-					attr tx $nlq
-					attr cost $etx
-				endobj
-			fi
-		done 
-		endarr 
+		
+		if [ $? ]
+		then
+			array link        
+			while read my_ip n_ip lq nlq etx 
+			do
+				if [ -n "$n_ip" -a "$etx" != "INFINITE" ]; then
+					obj
+						attr sourceAddr $my_ip
+						attr destAddr $n_ip	
+						attr rx $lq
+						attr tx $nlq
+						attr cost $etx
+					endobj
+				fi
+			done 
+			endarr
+		else
+			error=1
+		fi
 	endobj
+		
+	[ "$DEBUG" = "1" ] && echo "exiting olsr_links_common() $error"
+	return $error
 }
 
 olsr_global_update_common(){
+	[ "$DEBUG" = "1" ] && echo "entered olsr_global_update_common() $1 $suffix"
 
-	updateintervalglobal=$1
+	local updateintervalglobal=$1
+	local suffix=$2
+	local UPLOADPREFIXLOCAL
+	local error=0
+
 
 	UPLOADPREFIXLOCAL="?do=globalUpdate"
 
@@ -51,14 +67,6 @@ olsr_global_update_common(){
 	endarr -v UPLOADSUFFIX
 	rem_trailing_comma -v UPLOADSUFFIX
 
-
-	get_dnssuffix(){
-		config_get suffix "$1" suffix
-	}
-	
-	config_load olsrd
-	config_foreach get_dnssuffix LoadPlugin
-	
 	cp /var/etc/hosts.olsr $TEMP_DIR
 	cp /var/run/latlon.js $TEMP_DIR
 	
@@ -134,6 +142,10 @@ EOM
 
 	eval "$( $TEMP_DIR/latlon_crawler.awk $TEMP_DIR/latlon.js )"
 	upload
+	[ $UPLOADSPLITCHECKERROR -eq 1 ] && error=1 || error=$?
 	rm $TEMP_DIR/latlon_crawler.awk $TEMP_DIR/latlon.js $TEMP_DIR/hosts.olsr
+	
+	[ "$DEBUG" = "1" ] && echo "exiting olsr_global_update_common() $error"
+	return $error
 }
 

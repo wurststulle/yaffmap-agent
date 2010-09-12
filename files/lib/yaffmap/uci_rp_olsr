@@ -1,13 +1,50 @@
+#!/bin/sh
 . /lib/yaffmap/common_rp_olsr
 
 olsr_links(){
+	[ "$DEBUG" = "1" ] && echo "entering olsr_links()"
+	local config error=0
+
 	for config in /var/etc/olsrd.conf /var/etc/olsrd-ipv6.conf
 	do
-		[ -e $config ] && olsr_links_common $config
+		if [ -e $config ]
+		then
+			if ! olsr_links_common $config ; then error=1; ERROR_REASON="$ERROR_REASON olsr_links_common"; fi
+		fi
 	done
+
+	[ "$DEBUG" = "1" ] && echo "exiting olsr_links() $error"
+	return $error
 }
 
 olsr_global_update(){
+	[ "$DEBUG" = "1" ] && echo "entering olsr_global_update()"
+	local suffix 
+	local updateintervalglobal
+
 	updateintervalglobal=$( uci get freifunk_map.ffmap.globalinterval )
-  olsr_global_update_common $updateintervalglobal
+
+	get_dnssuffix(){
+		config_get suffix "$1" suffix
+	}
+	
+	local error=0
+	
+	config_load olsrd
+	config_foreach get_dnssuffix LoadPlugin
+
+	if [ -z "$updateintervalglobal" ]
+	then
+		echo "No olsr global update without globalinterval"
+		error=1
+	else
+		if ! olsr_global_update_common $updateintervalglobal $suffix 
+		then 
+			error=1
+			ERROR_REASON="$ERROR_REASON olsr_global_update_common"
+		fi
+	fi
+
+	[ "$DEBUG" = "1" ] && echo "exiting olsr_global_update() "$error
+	return $error
 }

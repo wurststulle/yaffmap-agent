@@ -11,6 +11,8 @@
 #
 
 config_get_batch(){
+	local s
+	
 	for s in $*
 	do
 		eval "config_get $s \"$1\" $s"
@@ -39,6 +41,7 @@ EOF
 }
 
 add_to_cron(){
+	local minutes nodeinterval linkinterval int s dez fract minstep
 	config_load freifunk_map
 	config_get_batch ffmap nodeinterval linkinterval
 	minutes=$(date | cut -d":" -f2)
@@ -111,6 +114,9 @@ EOF
 
 interface_addresses(){
 	[ "$DEBUG" = "1" ] &&	echo "entered interface_addresses() $1"
+
+	local ipaddr ip6addr ifname type aliasesmacaddr macaddr config a
+
 	ip_params(){		
 		local config=$1
 		config_get_batch "$config" ipaddr ip6addr
@@ -142,21 +148,20 @@ interface_addresses(){
 
 wifi_device_attributes(){
 	[ "$DEBUG" = "1" ] &&	echo "entered wifi_device_attributes() $1"
+
 	
 	wifi_iface_attributes(){
 		[ "$DEBUG" = "1" ] &&echo "entered wifi_iface_attributes() $1"
-		local config="$1"
+		local config="$1" device ssid bssid mode ifname wlmac network
 	
 		config_get device "$config" device
 		if [ "$device" = "$2" ]
 		then
-			config_get_batch "$config" ssid bssid mode ifname
+			config_get_batch "$config" ssid bssid mode ifname network
 			obj
 				[ -n "$ssid" ] && attr essid $ssid
 				[ -n "$bssid" ] && attr bssid $bssid
 				[ -n "$mode" ] && attr wlMode $mode
-				config_get network "$config" network
-				config_get ifname "$config" ifname
 				attr name $ifname
 				wlmac=$( ip addr show dev $ifname | grep -e '.*:.*:.*:.*:.*:.*' | cut -d" " -f 6 )
 				attr wlMacAddr $wlmac
@@ -167,7 +172,7 @@ wifi_device_attributes(){
 		fi
 	} 
 
-	local config="$1"
+	local config="$1" ignore type channel hwmode txpower macaddr antDirection antGain antBeamH antBeamV antPol antTilt macaddr var_cont s
 	
 	[ -z "$(uci get freifunk_map.$config.ignore 2>/dev/null )" ] && wifi_default_config	$config
 	
@@ -201,6 +206,7 @@ network_interfaces(){
 		local config=$1
 		local isbridge=0
 		local iswireless=0
+		local ignore ifname
 		
 		for net in $WIRELESS_NETWORKS
 		do
@@ -224,6 +230,7 @@ network_interfaces(){
 		fi
 	}
 	
+	local error=0
 
 	config_load network
 	scan_interfaces
@@ -246,6 +253,12 @@ network_interfaces(){
 			network_iface $int
 		done
 	endarr
+	
+	upload
+
+	error=$?
+	[ "$DEBUG" = "1" ] && echo "exiting network_interfaces() $error"
+	return $error
 }
 
 rf_links(){
@@ -254,7 +267,7 @@ rf_links(){
 	rflinks_wifi_iface(){
 		[ "$DEBUG" = "1" ] &&	echo "entered rflinks_wifi_iface() $1"
 
-		local config=$1
+		local config="$1" device ifname macaddr temp 
 		config_get device "$config" device
 		
 		if [ "$device" = "$2" ]
@@ -278,10 +291,12 @@ rf_links(){
 	rflinks_wifi_device(){
 		[ "$DEBUG" = "1" ] &&	echo "entered rflinks_wifi_device() $1"
 
-		local config=$1
+		local config=$1 type
 		config_get type "$config" type
 		config_foreach rflinks_wifi_iface wifi-iface "$config" $type
 	}
+	
+	local error=0
 	
 	DEVICES=""
 	array rfNeighbour
@@ -292,5 +307,11 @@ rf_links(){
 			rflinks_wifi_device $wd
 		done
 	endarr
+
+	upload
+	
+	error=$?
+	[ "$DEBUG" = "1" ] && echo "exiting rf_links() $error"
+	return $error
 }
 

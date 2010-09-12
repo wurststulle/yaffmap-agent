@@ -12,14 +12,14 @@ rem_trailing_comma(){
 }
 
 json_helper(){
-	local tail var
+	local var tail do
 	do="$1"
 	shift
 	
   if [ "$1" = "-v" ]
   then
   	var=$2
-  	arg=$1
+		tail="-v $2"
   	shift;shift
   else
     var="DATA"
@@ -29,14 +29,14 @@ json_helper(){
       "obj")		[ -n "$1" ] && app $var "\\\"$1\\\":"
 								app $var "{"
       					;;
-			"endobj")	rem_trailing_comma $arg $var
+			"endobj")	rem_trailing_comma $tail
 								app $var "},"
 								;;
 			"array")	
 								[ -n "$1" ] && app $var "\\\"$1\\\":"
 								app $var "["
 								;;
-			"endarr")	rem_trailing_comma $arg $var
+			"endarr")	rem_trailing_comma $tail
 								app $var "],"
       					;;
       "attr")		
