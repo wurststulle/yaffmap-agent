@@ -317,7 +317,10 @@ rf_links(){
 	uploadprefixglobal=$UPLOADPREFIX
 	array -v UPLOADPREFIX rfNeighbour
 	uploadsuffixglobal=$UPLOADSUFFIX
+	UPLOADSUFFIX=""
 	endarr -v UPLOADSUFFIX
+	rem_trailing_comma -v UPLOADSUFFIX
+	UPLOADSUFFIX="$UPLOADSUFFIX$uploadsuffixglobal"
 	
 	DEVICES=""
 	config_load wireless
@@ -328,11 +331,11 @@ rf_links(){
 	done
 
 	upload
+	error=$?
 	
 	UPLOADPREFIX=$uploadprefixglobal
 	UPLOADSUFFIX=$uploadsuffixglobal
 	
-	error=$?
 	[ "$DEBUG" = "1" ] && echo "exiting rf_links() $error"
 	return $error
 }

@@ -167,8 +167,8 @@ update(){
 	
 	case $update_mode in
 		links)
-			if ! rp_links; then error=1; fi
-			if ! rf_links; then error=1; fi
+			if ! rp_links; then error=1; ERROR_REASON="$ERROR_REASON rp_links"; fi
+			if ! rf_links; then error=1; ERROR_REASON="$ERROR_REASON rf_links"; fi
 			;;
 		global)	
 			if ! olsr_global_update ; then error=1; ERROR_REASON="$ERROR_REASON global_map_update"; fi
