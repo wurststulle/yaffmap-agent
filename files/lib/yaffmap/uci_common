@@ -106,15 +106,15 @@ EOF
 }
 
 wired_default_config(){
-	local config=$1
-	
+	local config=$1 ignore=0
+	[ "$config" = "loopback" ] && ignore=1
+
 	cat <<EOF >> /etc/config/freifunk_map
 
 config wired-iface $config
-	option	'ignore'	'0'
+	option	'ignore'	'$ignore'
 
 EOF
-	[ "$config" = "loopback" ] && uci set freifunk_map.$config.ignore=1
 }
 
 interface_addresses(){
