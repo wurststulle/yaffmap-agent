@@ -103,7 +103,7 @@ rp_links(){
 	obj neighbour
 		for rp in $ROUTINGPROTOCOLS
 		do
-			if ! ${rp}_links; then error=1; fi
+			${rp}_links || error=1
 		done
 	endobj
 
@@ -168,11 +168,11 @@ update(){
 	
 	case $update_mode in
 		links)
-			if ! rp_links; then error=1; ERROR_REASON="$ERROR_REASON rp_links"; fi
-			if ! rf_links; then error=1; ERROR_REASON="$ERROR_REASON rf_links"; fi
+			rp_links || error=1
+			rf_links || error=1
 			;;
 		global)	
-			if ! olsr_global_update ; then error=1; ERROR_REASON="$ERROR_REASON global_map_update"; fi
+			olsr_global_update || error=1
 			;;
 		* )	
 			load_node_data	
@@ -184,9 +184,9 @@ update(){
 			[ -n "$lon" ] && attr longitude $lon
 			if ! upload; then error=1; ERROR_REASON="$ERROR_REASON node_data"; fi
 		
-			if ! network_interfaces; then error=1; ERROR_REASON="$ERROR_REASON interface_data"; fi
-			if ! rp_links; then error=1; ERROR_REASON="$ERROR_REASON rplink_data"; fi
-			if ! rf_links; then error=1; ERROR_REASON="$ERROR_REASON rflink_data"; fi
+			network_interfaces || error=1
+			rp_links || error=1
+			rf_links || error=1
 			;;
 	esac
 
@@ -218,9 +218,9 @@ done
 
 case $( echo $args | cut -d" " -f1 ) in
 	start)
-		if ! create_config; then error=1; fi
+		create_config
 		migrate_from_old
-		if ! add_to_cron; then error=1; fi
+		add_to_cron
 		noerrmsg=1
 		;;
 	stop)

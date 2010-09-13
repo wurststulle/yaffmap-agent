@@ -1,16 +1,5 @@
 #!/bin/sh
 
-#
-# functions in this file called by init-script:
-# network_interfaces (uploads wired and wireless interfaces config by itself)
-# rf_links (uploads wireless intefaces config by itself)
-# create_config (creates the initial in config memory)
-# add_to_cron (creates cron_entries)
-# remove_from_cron
-# saveid (saves the nodeid)
-# load_node_data 
-#
-
 config_get_batch(){
 	local s
 	
@@ -168,7 +157,7 @@ wifi_device_attributes(){
 	
 	wifi_iface_attributes(){
 		[ "$DEBUG" = "1" ] &&echo "entered wifi_iface_attributes() $1"
-		local config="$1" device ssid bssid mode ifname wlmac network
+		local config="$1" device ssid bssid mode ifname wlmac network type
 	
 		config_get device "$config" device
 		if [ "$device" = "$2" ]
@@ -188,7 +177,7 @@ wifi_device_attributes(){
 		fi
 	} 
 
-	local config="$1" ignore type channel hwmode txpower macaddr antDirection antGain antBeamH antBeamV antPol antTilt macaddr var_cont s
+	local config="$1" error=0 ignore type channel hwmode txpower macaddr antDirection antGain antBeamH antBeamV antPol antTilt macaddr var_cont s
 	
 	[ -z "$(uci get freifunk_map.$config.ignore 2>/dev/null )" ] && wifi_default_config	$config
 	
@@ -211,7 +200,14 @@ wifi_device_attributes(){
 				config_foreach wifi_iface_attributes wifi-iface $config
 			endarr
 		endobj
+		upload_split_check
 	fi
+	
+	[ "$UPLOADSPLITCHECKERROR" -eq 1 ] && { 
+		error=1 
+		ERROR_REASON="$ERROR_REASON wifi_device_attributes" 
+	}
+	return $error
 }
 
 network_interfaces(){
@@ -242,6 +238,7 @@ network_interfaces(){
 					attr name $ifname
 					interface_addresses $config
 				endobj
+				upload_split_check
 			fi
 		fi
 	}
@@ -251,16 +248,26 @@ network_interfaces(){
 	config_load network
 	scan_interfaces
 
-	array wlDevice
+	uploadprefixglobal=$UPLOADPREFIX
+	uploadsuffixglobal=$UPLOADSUFFIX
+
+	UPLOADSUFFIX=""
+	endarr -v UPLOADSUFFIX
+	rem_trailing_comma -v UPLOADSUFFIX
+	UPLOADSUFFIX="$UPLOADSUFFIX$uploadsuffixglobal"
+
+	array -v UPLOADPREFIX wlDevice
 		config_load wireless
 		config_foreach make_dev_list wifi-device
 		for wd in $DEVICES
 		do
 			wifi_device_attributes $wd
 		done
-	endarr
+	upload
+	error=$?
 
-	array wiredIface
+	UPLOADPREFIX="$uploadprefixglobal"
+	array -v UPLOADPREFIX wiredIface
 		config_load network
 		DEVICES=""
 		config_foreach make_dev_list interface
@@ -268,11 +275,15 @@ network_interfaces(){
 		do
 			network_iface $int
 		done
-	endarr
 	
 	upload
+	[ "$error" -eq 0 ] && error=$?
+	
+	UPLOADPREFIX=$uploadprefixglobal
+	UPLOADSUFFIX=$uploadsuffixglobal
 
-	error=$?
+	[ "$UPLOADSPLITCHECKERROR" -eq 1 ] && error=1
+	[ "$error" -eq 1 ] &&	ERROR_REASON="$ERROR_REASON network_interfaces"
 	[ "$DEBUG" = "1" ] && echo "exiting network_interfaces() $error"
 	return $error
 }
@@ -283,7 +294,7 @@ rf_links(){
 	rflinks_wifi_iface(){
 		[ "$DEBUG" = "1" ] &&	echo "entered rflinks_wifi_iface() $1"
 
-		local config="$1" device ifname macaddr temp 
+		local config="$1" error=0 device ifname macaddr temp 
 		config_get device "$config" device
 		
 		if [ "$device" = "$2" ]
@@ -291,25 +302,33 @@ rf_links(){
 			config_get ifname $config ifname
 			macaddr=$( ip addr show dev $ifname | grep -e '.*:.*:.*:.*:.*:.*' | cut -d" " -f 6 )
 			case $3 in
-				atheros)	temp=$( wlanconfig $ifname list sta | grep -v ADDR | grep -i -v $macaddr | awk -v source=$macaddr '{print "obj; attr sMac "source"; attr dMac "$1"; attr rssi "$6"; endobj;upload_split_check"}' )
-									eval "$temp"
+				atheros)	
+					temp=$( wlanconfig $ifname list sta | grep -v ADDR | grep -i -v $macaddr | awk -v source=$macaddr '{print "obj; attr sMac "source"; attr dMac "$1"; attr rssi "$6"; endobj;upload_split_check"}' ) 
+					eval "$temp"
 					;;
-				mac80211)	temp=$(iw $ifname station dump | awk -v source=$macaddr '{
-										if($1~/Station/) print "obj;attr sMac "source";attr dMac "$2";";
-										if($1~/signal/) print "attr rssi "$2";";
-										if($0~/tx bitrate/) print "attr txrate "$3";endobj;upload_split_check;"}' )
-									eval "$temp"
+				mac80211)	
+					temp=$( iw $ifname station dump | awk -v source=$macaddr '{
+						if($1~/Station/) print "obj;attr sMac "source";attr dMac "$2";";
+						if($1~/signal/) print "attr rssi "$2";";
+						if($0~/tx bitrate/) print "attr txrate "$3";endobj;upload_split_check;"}' )
+					eval "$temp"
 					;;
 			esac
 		fi
+		
+		[ "$UPLOADSPLITCHECKERROR" -eq 1 ] && ERROR_REASON="$ERROR_REASON rflinks_wifi_iface($ifname)"
+		return $UPLOADSPLITCHECKERROR
 	}
 
 	rflinks_wifi_device(){
 		[ "$DEBUG" = "1" ] &&	echo "entered rflinks_wifi_device() $1"
+		local error=0
 
 		local config=$1 type
 		config_get type "$config" type
 		config_foreach rflinks_wifi_iface wifi-iface "$config" $type
+		
+		error=$?
 	}
 	
 	local error=0 uploadprefixglobal uploadsuffixglobal
@@ -332,10 +351,11 @@ rf_links(){
 
 	upload
 	error=$?
-	
 	UPLOADPREFIX=$uploadprefixglobal
 	UPLOADSUFFIX=$uploadsuffixglobal
-	
+
+	[ "$UPLOADSPLITCHECKERROR" -eq 1 ]	&& error=1
+	[ "$error" -eq 1 ] && ERROR_REASON="$ERROR_REASON rf_links"
 	[ "$DEBUG" = "1" ] && echo "exiting rf_links() $error"
 	return $error
 }
