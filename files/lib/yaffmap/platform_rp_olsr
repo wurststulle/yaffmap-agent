@@ -1,0 +1,9 @@
+. /lib/yaffmap/common_rp_olsr
+
+olsr_links(){
+	  for config in /var/etc/olsrd.conf /var/etc/olsrd-ipv6.conf
+  	do
+    	[ -e $config ] && olsr_links_common $config
+	  done
+
+}
