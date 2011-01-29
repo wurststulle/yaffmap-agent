@@ -44,10 +44,10 @@ EOF
 add_to_cron(){
 	local minutes nodeinterval linksinterval int s dez fract minstep
 	config_load freifunk_map
-	config_get_batch ffmap nodeinterval linksinterval
+	config_get_batch ffmap nodeinterval linksinterval globalinterval
 	minutes=$(date | cut -d":" -f2)
 	
-	for s in node links
+	for s in node links global
 	do
 		eval "int=\$${s}interval"
 		dez=$( echo $int | cut -d"." -f1 )
