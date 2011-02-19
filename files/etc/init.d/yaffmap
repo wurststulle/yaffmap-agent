@@ -185,6 +185,8 @@ update(){
 			attr hostname $( uname -n )
 			[ -n "$lat" ] && attr latitude $lat
 			[ -n "$lon" ] && attr longitude $lon
+			[ "$isHna" -eq 1 ] && attr isHna true || attr isHna false
+			[ -n "$defGateway" ] && attr defGateway $defGateway
 			if ! upload; then error=1; ERROR_REASON="$ERROR_REASON node_data"; fi
 		
 			network_interfaces || error=1

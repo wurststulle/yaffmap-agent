@@ -105,8 +105,13 @@ EOF
 		if  (\$1~/^Node|^Self/ ) {
 			gsub("Node(","")
 			gsub("Self(","")
-			print "obj;attr name "\$6";attr latitude "\$2";attr longitude "\$3";array iface;"
-			print "obj;attr ipv4Addr "\$1";endobj;"mid[\$1]"endarr;endobj;upload_split_check;"
+			print "obj;attr name "\$6";attr latitude "\$2";attr longitude "\$3";attr defGateway "\$5";"
+			if (\$4=="1") {
+				print "attr isHna true;"
+			}else{
+				print "attr isHna false;"
+			}
+			print "array iface;obj;attr ipv4Addr "\$1";endobj;"mid[\$1]"endarr;endobj;upload_split_check;"
 			delete mid[\$1]
 			hostplussuffix=\$6"$suffix"
 			for ( s in hosts_names ) {
