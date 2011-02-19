@@ -14,7 +14,7 @@ DEBUG=0
 QUIET=0
 TEMP_DIR=/tmp
 
-for file in $( ls /lib/yaffmap/* )
+for file in $( find /lib/yaffmap/* ! -name *.txt )
 do
 	. $file
 done
@@ -174,6 +174,9 @@ update(){
 		global)	
 			olsr_global_update || error=1
 			;;
+		upgrade)
+			check_new_release
+			;;
 		* )	
 			load_node_data	
 			attr updateIntervalNode $nodeinterval
@@ -192,6 +195,18 @@ update(){
 
 	[ "$DEBUG" = "1" ] && echo "exiting update() $error"
 	return $error
+}
+
+check_new_release(){
+	local txurl rev
+	local started="false"
+	
+	rel=$(cat /lib/yaffmap/release.txt)
+	txurl="${URL}?do=getUpdate&rev=${rel}&tree=devel&version=uci"
+	upload $txurl
+	eval $SERVER_RESPONSE #this creates the variable "url"
+
+	upgrade $url	
 }
 
 local error=0 usage=0 noerrmsg=0
@@ -237,8 +252,14 @@ case $( echo $args | cut -d" " -f1 ) in
 		$0 start
 		[ $? -eq 1 ] && error=1
 		;;
+	check_new_release)
+		check_new_release
+		;;
+	migrate_from_old)
+		migrate_from_old
+		;;
 	*)	
-			echo "usage: $0 [options] start|stop|(update [links|global])"
+			echo "usage: $0 [options] start|stop|(update [links|global])|check_new_release|migrate_from_old"
 			echo "	options:"
 			echo "	-v		show debug output"
 			echo "	-q		do not show show success or error messages"
@@ -253,7 +274,7 @@ if [ $noerrmsg -eq 0 ]
 then
 	if [ $error -eq 0 ]
 	then
-		echo "Update Successful"
+		[ "$QUIET" -ne 1 ] && echo "Update Successful"
 	else
 		echo "Error during update. ERROR_REASON=$ERROR_REASON"
 		echo "Please start with argument -v and mail the output to the developers"

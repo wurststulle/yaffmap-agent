@@ -14,8 +14,10 @@ make_dev_list(){
 }
 
 migrate_from_old(){
-	local linkinterval
+	local linkinterval upgradeinterval
+
 	linkinterval=$(uci get freifunk_map.ffmap.linkinterval 2>/dev/null)
+	
 	if [ -n "$linkinterval" ]
 	then
 		uci set freifunk_map.ffmap.linksinterval=$linkinterval
@@ -23,6 +25,47 @@ migrate_from_old(){
 		remove_from_cron
 		add_to_cron
 	fi
+
+	upgradeinterval=$(uci get freifunk_map.ffmap.upgradeinterval 2>/dev/null)
+	
+	if [ -z "$upgradeinterval" ]
+	then
+		uci set freifunk_map.ffmap.upgradeinterval=0.1
+		remove_from_cron
+		add_to_cron
+	fi
+
+	
+	if [ -n $( grep yaffmap /etc/crontabs/root ) ]
+	then
+		if [ -z $( grep yaffmap /etc/crontabs/root | grep -q ) ]
+		then
+			remove_from_cron
+			add_to_cron
+		fi
+	fi
+}
+
+upgrade(){
+	local url=$1
+
+	if [ -n "$url" ]
+	then
+		wget -T30 -q -O/tmp/yaffmap_redist.tar.gz $url
+		error=$?
+		
+		if [ "$error" -eq 0 ]
+		then
+			#todo: check for successfull untaring
+			[ -n $( grep yaffmap /etc/crontabs/root ) ] && started="true"
+			[ "$started" == "true" ] && remove_from_cron
+			rm -rf /lib/yaffmap /etc/init.d/yaffmap
+			tar -C / -xzf /tmp/yaffmap_redist.tar.gz
+			[ "$started" == "true" ] && add_to_cron
+		fi
+	fi
+
+	/etc/init.d/yaffmap migrate_from_old
 }
 
 create_config(){
@@ -35,6 +78,7 @@ config 'node' 'ffmap'
 	option	'id' '0'
 	option	'nodeinterval' '1'
 	option	'linksinterval' '0.1'
+	option	'upgradeinterval' '12'
 	option	'timeout' '5'
 
 EOF
@@ -42,26 +86,30 @@ EOF
 }
 
 add_to_cron(){
-	local minutes nodeinterval linksinterval int s dez fract minstep
+	local minutes nodeinterval linksinterval globalinterval upgradeinterval int s dez fract minstep
 	config_load freifunk_map
-	config_get_batch ffmap nodeinterval linksinterval globalinterval
+	config_get_batch ffmap nodeinterval linksinterval globalinterval upgradeinterval
 	minutes=$(date | cut -d":" -f2)
 	
-	for s in node links global
+	for s in node links global upgrade
 	do
 		eval "int=\$${s}interval"
-		dez=$( echo $int | cut -d"." -f1 )
-		fract=$( echo $int | cut -d"." -f2 )
-	
-		if [ -z "$( grep yaffmap /etc/crontabs/root | grep $s )" ]
+
+		if [ -n "$int" ]
 		then
-			if [ "$dez" = "0" ]
+			dez=$( echo $int | cut -d"." -f1 )
+			fract=$( echo $int | cut -d"." -f2 )
+	
+			if [ -z "$( grep yaffmap /etc/crontabs/root | grep $s )" ]
 			then
-				fract=${fract:0:1}
-				minstep=$( expr 60 \* $fract / 10 )
-				echo "*/$minstep * * * * /etc/init.d/yaffmap update $s" >> /etc/crontabs/root
-			else
-				echo "$minutes */$dez * * * /etc/init.d/yaffmap update $s" >> /etc/crontabs/root
+				if [ "$dez" = "0" ]
+				then
+					fract=${fract:0:1}
+					minstep=$( expr 60 \* $fract / 10 )
+					echo "*/$minstep * * * * /etc/init.d/yaffmap update $s -q" >> /etc/crontabs/root
+				else
+					echo "$minutes */$dez * * * /etc/init.d/yaffmap update $s -q" >> /etc/crontabs/root
+				fi
 			fi
 		fi
 	done
