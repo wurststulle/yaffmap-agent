@@ -35,10 +35,11 @@ migrate_from_old(){
 		add_to_cron
 	fi
 
-	
-	if [ -n $( grep yaffmap /etc/crontabs/root ) ]
+	grep yaffmap /etc/crontabs/root > /tmp/yaffmap_tmp
+	if [ -s /tmp/yaffmap_tmp ]
 	then
-		if [ -z $( grep yaffmap /etc/crontabs/root | grep -q ) ]
+		cat /tmp/yaffmap_tmp | grep "\-q" > /tmp/yaffmap_tmp2
+		if [ ! -s /tmp/yaffmap_tmp2 ]
 		then
 			remove_from_cron
 			add_to_cron
@@ -57,7 +58,8 @@ upgrade(){
 		if [ "$error" -eq 0 ]
 		then
 			#todo: check for successfull untaring
-			[ -n $( grep yaffmap /etc/crontabs/root ) ] && started="true"
+			cat /etc/crontabs/root > /tmp/yaffmap_tmp
+			[ -s /tmp/yaffmap_tmp ] && started="true"
 			[ "$started" == "true" ] && remove_from_cron
 			rm -rf /lib/yaffmap /etc/init.d/yaffmap
 			tar -C / -xzf /tmp/yaffmap_redist.tar.gz
@@ -65,7 +67,7 @@ upgrade(){
 		fi
 	fi
 
-	/etc/init.d/yaffmap migrate_from_old
+	/etc/init.d/yaffmap migrate_from_old -q
 }
 
 create_config(){
@@ -91,17 +93,18 @@ add_to_cron(){
 	config_get_batch ffmap nodeinterval linksinterval globalinterval upgradeinterval
 	minutes=$(date | cut -d":" -f2)
 	
-	for s in node links global upgrade
-	do
-		eval "int=\$${s}interval"
+	grep yaffmap /etc/crontabs/root > /tmp/yaffmap_tmp
+	if [ ! -s /tmp/yaffmap_tmp ]
+	then
+		for s in node links global upgrade
+		do
+			eval "int=\$${s}interval"
 
-		if [ -n "$int" ]
-		then
-			dez=$( echo $int | cut -d"." -f1 )
-			fract=$( echo $int | cut -d"." -f2 )
-	
-			if [ -z "$( grep yaffmap /etc/crontabs/root | grep $s )" ]
+			if [ -n "$int" ]
 			then
+				dez=$( echo $int | cut -d"." -f1 )
+				fract=$( echo $int | cut -d"." -f2 )
+		
 				if [ "$dez" = "0" ]
 				then
 					fract=${fract:0:1}
@@ -111,8 +114,8 @@ add_to_cron(){
 					echo "$minutes */$dez * * * /etc/init.d/yaffmap update $s -q" >> /etc/crontabs/root
 				fi
 			fi
-		fi
-	done
+		done
+	fi
 }
 
 remove_from_cron(){

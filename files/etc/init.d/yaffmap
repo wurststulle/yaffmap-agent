@@ -202,7 +202,7 @@ check_new_release(){
 	local started="false"
 	
 	rel=$(cat /lib/yaffmap/release.txt)
-	txurl="${URL}?do=getUpdate&rev=${rel}&tree=devel&version=uci"
+	txurl="${URL}?do=getUpgrade&rel=${rel}&tree=devel&version=uci"
 	upload $txurl
 	eval $SERVER_RESPONSE #this creates the variable "url"
 
