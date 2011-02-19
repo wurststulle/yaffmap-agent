@@ -144,6 +144,8 @@ load_node_data(){
 	then
 		eval $(grep Self $latlon_file | sed "s/'//g" | awk '{FS=",";print "isHna="$4";defGateway="$5";"}')
 	fi
+	
+	agentRelease="$(cat /lib/yaffmap/release.txt)"
 }
 
 
