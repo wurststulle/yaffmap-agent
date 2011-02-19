@@ -75,7 +75,7 @@ done
 echo "Creating tarball."
 cd files
 echo "$release" > lib/yaffmap/release.txt
-tar --exclude=".svn" --exclude="*~"  -czf ../yaffmap_${release}_${version}_${tree}.tar.gz etc/init.d/yaffmap lib/yaffmap/common* lib/yaffmap/$1* lib/yaffmap/release.txt
+tar --exclude=".svn" --exclude="*~"  -czf ../yaffmap_${release}_${version}_${tree}.tar.gz etc/init.d/yaffmap lib/yaffmap/common* lib/yaffmap/$version* lib/yaffmap/release.txt
 check_error $? "tarball creation"
 
 #announce
