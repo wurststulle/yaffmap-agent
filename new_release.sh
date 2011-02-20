@@ -20,7 +20,8 @@ check_error(){
 }
 
 announce(){
-	returnstring=$( curl --upload-file ../yaffmap_${RELEASE}_${VERSION}_${TREE}.tar.gz  "$ANNOUNCE_URL?do=newAgentReleaseWithFile&tree=$TREE&version=$VERSION&release=$RELEASE" )
+	[ "$HEAD" = "1" ] && ishead="&isHead=true"
+	returnstring=$( curl --upload-file ../yaffmap_${RELEASE}_${VERSION}_${TREE}.tar.gz  "$ANNOUNCE_URL?do=newAgentReleaseWithFile&tree=$TREE&version=$VERSION&release=$RELEASE$ishead" )
 	check_error $? "upload and accouncement to webserver"
 
 	errorcode=$( echo $returnstring | cut -d"|" -f1 )
