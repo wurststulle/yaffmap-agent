@@ -14,7 +14,7 @@ DEBUG=0
 QUIET=0
 TEMP_DIR=/tmp
 
-for file in $( find /lib/yaffmap/* ! -name *.txt )
+for file in $( find /lib/yaffmap/* ! -name *.txt | grep -v \~ )
 do
 	. $file
 done
@@ -188,8 +188,8 @@ update(){
 			[ "$isHna" -eq 1 ] && attr isHna true || attr isHna false
 			[ -n "$defGateway" ] && attr defGateway $defGateway
 			[ -n "$agentRelease" ] && attr agentRelease $agentRelease
-			if ! upload; then error=1; ERROR_REASON="$ERROR_REASON node_data"; fi
-		
+			if ! upload; then error=1; ERROR_REASON="$ERROR_REASON node_update"; fi
+
 			network_interfaces || error=1
 			rp_links || error=1
 			rf_links || error=1
@@ -201,7 +201,7 @@ update(){
 }
 
 check_new_release(){
-	local txurl rev
+	local txurl rel
 	local started="false"
 	
 	rel=$(cat /lib/yaffmap/release.txt)
