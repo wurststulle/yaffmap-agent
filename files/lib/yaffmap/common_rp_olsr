@@ -56,14 +56,58 @@ EOM
 olsr_global_update_common(){
 	[ "$DEBUG" = "1" ] && echo "entered olsr_global_update_common() $1 $suffix"
 
-	local updateintervalglobal=$1
-	local suffix=$2
-	local metrictype=$3
-	local ipversion=$4
-	local UPLOADPREFIXLOCAL
+	cat <<EOF > $TEMP_DIR/yaffmap_status_bar.awk
+	function update_status_bar(text)
+	{
+		if ( quiet != 1 ) {
+			barlength=25
+			percent=curlines/datalines*100
+			printf("%s dataset %s of %s : %4.2f%%  ", text, curlines, datalines, percent ) > "/dev/stderr"
+			hashes=int( percent / int( 100 / barlength ) )
+			dots=barlength - hashes
+			for (i=1; i<=hashes; i++ ) 
+				printf "\#" > "/dev/stderr"
+			for (i=1; i<=dots; i++ )
+				printf "." > "/dev/stderr"
+			printf "\r" > "/dev/stderr"
+			++curlines
+		}
+	}
+	
+EOF
+
+	cat $TEMP_DIR/yaffmap_status_bar.awk > $TEMP_DIR/yaffmap_status_bar2.awk
+	cat <<EOF >> $TEMP_DIR/yaffmap_status_bar2.awk
+	{
+		text=\$1
+ 		curlines=\$2
+  		datalines=\$3
+			update_status_bar(text)
+	}
+EOF
+
+	update_status_bar(){
+		[ "$QUIET" = "1" ] && return 0
+		local text=$1 curlines=$2 datalines=$3 diff
+		
+		diff=$( expr $curlines - $laststatusbarupdate )
+		
+		if [ "$diff" -gt 5 ]
+		then
+			echo "$text $curlines $datalines" | awk -f $TEMP_DIR/yaffmap_status_bar2.awk 
+			laststatusbarupdate=$curlines
+		fi
+	}
+
+	local updateintervalglobal="$1"
+	local suffix="$2"
+	local metrictype="$3"
+	local ipversion="$4"
+	local latlonfile="$5"
+	local hostsfile="$6"
 	local error=0
-
-
+	local laststatusbarupdate=0
+	
 	UPLOADPREFIX="?do=globalUpdate"
 
  	[ -n "$updateintervalglobal" ] && UPLOADPREFIX="$UPLOADPREFIX&updateIntervalGlobal=$updateintervalglobal"
@@ -72,14 +116,16 @@ olsr_global_update_common(){
 	endarr -v SECTIONSUFFIX
 	rem_trailing_comma -v SECTIONSUFFIX
 
-	cp /var/etc/hosts.olsr $TEMP_DIR
-	cp /var/run/latlon.js $TEMP_DIR
+	cp $hostsfile $TEMP_DIR/hosts.olsr
+	cp $latlonfile $TEMP_DIR/latlon.js
+	
+	datalines=$(cat $latlonfile | wc -l)
+	
 	
 	cat <<EOF > $TEMP_DIR/latlon_crawler.awk
 #!/usr/bin/awk -f
 BEGIN{
 EOF
-
 	chmod 755 $TEMP_DIR/latlon_crawler.awk
 
 	awk '
@@ -88,24 +134,48 @@ EOF
 		if ($1~/^[1-9]/) 
 			if ($1!~/127\.0\.0\./) {
 				print "	hosts_names[\""$2","$1"\"]" 
+				print " named_hosts[\""$1"\"]"
 			}
 	}
 	' $TEMP_DIR/hosts.olsr >> $TEMP_DIR/latlon_crawler.awk
 
+	cat <<EOM >> $TEMP_DIR/latlon_crawler.awk
+	quiet=$QUIET
+	datalines=$datalines
+	datalinescorrected=0
+	curlines=0
+	}
+EOM
 
+	cat $TEMP_DIR/yaffmap_status_bar.awk >> $TEMP_DIR/latlon_crawler.awk
 
 	cat <<EOM >> $TEMP_DIR/latlon_crawler.awk
-	}
 	{
 		gsub(");","")
 		gsub(","," ")
 		gsub("'","")
-	
+		
 		if ( \$1~/^Mid/ ) {
 			gsub("Mid(","")
 			mid[\$1]=mid[\$1]"obj;attr ipv4Addr "\$2";endobj;"
+			next
 		}
+
 		if  (\$1~/^Node|^Self/ ) {
+			if ( datalinescorrected == 0 ) {
+				for ( s in hosts_names ) {
+					split( s, separate, "," )
+					if ( separate[2] in mid ) {
+						--datalines
+					}
+				}
+				for ( s in mid ) {
+					if ( ! s in named_hosts ) {
+						--datalines
+					}
+				}
+				datalinescorrected=1
+			}
 			gsub("Node(","")
 			gsub("Self(","")
 			print "obj;attr name "\$6";attr latitude "\$2";attr longitude "\$3";attr defGateway "\$5";"
@@ -114,7 +184,8 @@ EOF
 			}else{
 				print "attr isHna false;"
 			}
-			print "array iface;obj;attr ipv4Addr "\$1";endobj;"mid[\$1]"endarr;endobj;upload_split_check;"
+			print "array iface;obj;attr ipv4Addr "\$1";endobj;"mid[\$1]"endarr;endobj;upload_split_check;update_status_bar Uploading",curlines,datalines";"
+			update_status_bar("Processing")
 			delete mid[\$1]
 			hostplussuffix=\$6"$suffix"
 			for ( s in hosts_names ) {
@@ -122,22 +193,27 @@ EOF
 				if ( separate[1] == hostplussuffix )
 					delete hosts_names[s]
 			}
+			next
 		}
+
 		if  (\$1~/Link/ ) {
-		gsub("PLink(","")
-		gsub("Link(","")
-		link[\$2";"\$1";"\$3";"\$4";"\$5]
+			gsub("PLink(","")
+			gsub("Link(","")
+			link[\$2";"\$1";"\$3";"\$4";"\$5]
+			next
 		}
 	}
 	END{
 		for ( s in hosts_names ) {
 			split( s, separate, "," )
-			print "obj;attr name "separate[1]";array iface;obj;attr ipv4Addr "separate[2]";endobj;"mid[separate[2]]"endarr;endobj;upload_split_check;"
+			print "obj;attr name "separate[1]";array iface;obj;attr ipv4Addr "separate[2]";endobj;"mid[separate[2]]"endarr;endobj;upload_split_check;update_status_bar Uploading",curlines,datalines";"
+			update_status_bar("Processing")
 			delete mid[separate[2]]
 		}
 
 		for ( m in mid ){
-			print "obj;array iface;obj;attr ipv4Addr "m";endobj;"mid[m]"endarr;endobj;upload_split_check;"
+			print "obj;array iface;obj;attr ipv4Addr "m";endobj;"mid[m]"endarr;endobj;upload_split_check;update_status_bar Uploading",curlines,datalines";"
+			update_status_bar("Processing")
 			}
 		
 		print "SECTIONPREFIX=\"\""
@@ -154,18 +230,22 @@ EOF
 		lc=0
 		for ( l in link ){
 			split(l,line,";")
-			print "obj;attr sAddr "line[1]";attr dAddr "line[2]";attr rx "line[3]";attr tx "line[4]";attr cost "line[5]";endobj;upload_split_check;"
+			print "obj;attr sAddr "line[1]";attr dAddr "line[2]";attr rx "line[3]";attr tx "line[4]";attr cost "line[5]";endobj;upload_split_check;update_status_bar Uploading",curlines,datalines";"
+			update_status_bar("Processing")
 			++lc
 		}
-		print "echo \"links uploaded: "lc"\""
+		
+		print "" > "/dev/stderr"
+		print "echo; echo \"links uploaded: "lc"\""
 	}
 EOM
 
-	eval "$( $TEMP_DIR/latlon_crawler.awk $TEMP_DIR/latlon.js )"
-	upload
+	eval "$( $TEMP_DIR/latlon_crawler.awk $TEMP_DIR/latlon.js )" 
+
+	upload_split_check -p
 	error=$?
 	[ "$UPLOADSPLITCHECKERROR" -eq 1 ] && error=1 
-	rm $TEMP_DIR/latlon_crawler.awk $TEMP_DIR/latlon.js $TEMP_DIR/hosts.olsr
+	rm $TEMP_DIR/latlon_crawler.awk $TEMP_DIR/latlon.js $TEMP_DIR/hosts.olsr $TEMP_DIR/yaffmap_status_bar*
 	
 	[ "$DEBUG" = "1" ] && echo "exiting olsr_global_update_common() $error"
 	return $error

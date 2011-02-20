@@ -21,7 +21,8 @@ olsr_global_update(){
 	[ "$DEBUG" = "1" ] && echo "entering olsr_global_update()"
 	local error=0
 	local suffix 
-	local updateintervalglobal
+	local updateintervalglobal ipversion metrictype
+	local latlonfile hostsfile
 
 	updateintervalglobal=$( uci get freifunk_map.ffmap.globalinterval 2>/dev/null)
 
@@ -41,8 +42,10 @@ olsr_global_update(){
 			if [ -e $olsr_config ]
 			then
 				metrictype=$( grep LinkQualityAlgorithm $olsr_config | cut -d" " -f2 | sed 's/"//g' )
-				ipversion=$( grep IpVersion $olsr_config | cut -d" " -f2 )
-				if ! olsr_global_update_common $updateintervalglobal $suffix $metrictype $ipversion
+				ipversion=$( grep IpVersion $olsr_config | cut -d" " -f2 | sed 's/"//g' )
+				latlonfile=$( grep latlon-file $olsr_config | cut -d" " -f3 | sed 's/"//g' )
+				hostsfile=$( grep hosts-file $olsr_config | cut -d" " -f3 | sed 's/"//g' )
+				if ! olsr_global_update_common $updateintervalglobal $suffix $metrictype $ipversion $latlonfile $hostsfile
 				then 
 					error=1
 					ERROR_REASON="$ERROR_REASON olsr_global_update_common"
