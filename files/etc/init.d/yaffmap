@@ -35,10 +35,13 @@ upload(){
 
 	if [ "$PRETEND_UPLOAD" = "1" ]
 	then
-		length=${#txurl}
-		echo "\$TXURL is $length long"
-		echo "This would have been transmitted without '-p':"
-		echo "$txurl"
+		if [ "$QUIET" != "1" ]
+		then
+			length=${#txurl}
+			echo "\$TXURL is $length long"
+			echo "This would have been transmitted without '-p':"
+			echo "$txurl"
+		fi
 	else
 		returnstring="$( wget -T30 -q -O- $txurl )"
 		error=$?
