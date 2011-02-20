@@ -332,10 +332,7 @@ esac
 
 if [ $noerrmsg -eq 0 ]
 then
-	if [ $error -eq 0 ]
-	then
-		[ "$QUIET" -ne 1 ] && echo "Update Successful"
-	else
+	if [ $error -ne 0 ]
 		echo "Error during update. ERROR_REASON=$ERROR_REASON"
 		echo "Please start with argument -v and mail the output to the developers"
 	fi
