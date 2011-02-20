@@ -58,6 +58,7 @@ upgrade(){
 		if [ "$error" -eq 0 ]
 		then
 			#todo: check for successfull untaring
+			[ "$DEBUG" = "1" ] && echo "Download of new release successfull. Unpacking"
 			cat /etc/crontabs/root > /tmp/yaffmap_tmp
 			[ -s /tmp/yaffmap_tmp ] && started="true"
 			[ "$started" == "true" ] && remove_from_cron

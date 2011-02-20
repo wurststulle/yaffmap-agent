@@ -187,6 +187,7 @@ getid(){
 	fi
 	
 	[ "$DEBUG" = "1" ] && echo "exiting getid() $error"
+	[ "$error" = "1" ] && ERROR_REASON=" getid "
 	return $error
 }
 
@@ -255,7 +256,12 @@ check_new_release(){
 	rel=$(cat /lib/yaffmap/release.txt)
 	txurl="${URL}?do=getUpgrade&rel=${rel}&tree=devel&version=uci"
 	upload $txurl
-	eval $SERVER_RESPONSE #this creates the variable "url"
+	
+	if [ -n "$SERVER_RESPONSE" ]
+	then
+		eval $SERVER_RESPONSE #this creates the variable "url"
+		echo "New Map Agent release found, attempting to upgrade!"
+	fi
 
 	upgrade $url	
 }
