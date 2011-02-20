@@ -20,10 +20,8 @@ check_error(){
 }
 
 announce(){
-	local txurl="$1"
-
-	returnstring="$( wget -T30 -q -O- $txurl )"
-	check_error $? "announcement to webserver"
+	returnstring=$( curl --upload-file ../yaffmap_${RELEASE}_${VERSION}_${TREE}.tar.gz  "$ANNOUNCE_URL?do=newAgentReleaseWithFile&tree=$TREE&version=$VERSION&release=$RELEASE" )
+	check_error $? "upload and accouncement to webserver"
 
 	errorcode=$( echo $returnstring | cut -d"|" -f1 )
 	errormessage=$( echo $returnstring | cut -d"|" -f2 )
@@ -39,27 +37,29 @@ announce(){
 		echo 
 		echo "Transmit String: $txurl"
 		echo
-		check_error 1 "response from announcement server"
+		check_error 1 "upload to webserver"
 	fi
+	
+	return $error
 }
 
 
 while [ -n "$1" ]
 do
 	case $1 in
-		"-r"	) release=$2 
+		"-r"	) RELEASE=$2 
 						shift ;;
-		"-v"	)	version=$2 
+		"-v"	)	VERSION=$2 
 						shift ;;
-		"-t"	)	tree=$2 
+		"-t"	)	TREE=$2 
 						shift ;;
-		"-h"	) head=1 ;;
+		"-h"	) HEAD=1 ;;
 	esac
 	shift
 done	
 
 
-for s in release version tree
+for s in RELEASE VERSION TREE
 do
 	eval "tmp=\$$s"
 	if [ -z "$tmp" ]
@@ -74,24 +74,11 @@ done
 #packaging
 echo "Creating tarball."
 cd files
-echo "$release" > lib/yaffmap/release.txt
-tar --exclude=".svn" --exclude="*~"  -czf ../yaffmap_${release}_${version}_${tree}.tar.gz etc/init.d/yaffmap lib/yaffmap/common* lib/yaffmap/$version* lib/yaffmap/release.txt
+echo "$RELEASE" > lib/yaffmap/release.txt
+tar --exclude=".svn" --exclude="*~"  -czf ../yaffmap_${RELEASE}_${VERSION}_${TREE}.tar.gz etc/init.d/yaffmap lib/yaffmap/common* lib/yaffmap/$VERSION* lib/yaffmap/release.txt
 check_error $? "tarball creation"
-
-#announce
-echo "Announcing new release to webserver"
-txurl="$ANNOUNCE_URL?do=newAgentRelease&release=$release&tree=$tree&version=$version"
-announce "$txurl"
 
 #upload
 echo "Uploading to webserver"
-scp -P 6667 ../yaffmap_${release}_${version}_${tree}.tar.gz wurst@wurststulle.dyndns.org:/mnt/lager/www/ffmap/build/download/
+announce
 check_error $? "upload to webserver"
-
-#announce as head
-if [ "$head" -eq 1 ] 
-then 
-	echo "Announcing this release as head"
-	txurl="$txurl&isHead=true"
-	announce "$txurl"
-fi
