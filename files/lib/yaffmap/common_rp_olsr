@@ -7,10 +7,10 @@ olsr_links_common(){
 	local olsr_config=$1 error=0
 	local metric ipversion my_ip n_ip lq nlq etx
 	
-	obj olsr
-		attr metric $( grep LinkQualityAlgorithm $olsr_config | cut -d" " -f2 | sed 's/"//g' ) 
+	obj -v SECTIONPREFIX olsr
+		attr -v SECTIONPREFIX metric $( grep LinkQualityAlgorithm $olsr_config | cut -d" " -f2 | sed 's/"//g' ) 
 		ipversion=$( grep IpVersion $olsr_config | cut -d" " -f2 )
-		attr ipv $ipversion 
+		attr -v SECTIONPREFIX ipv $ipversion 
     
 		case "$ipversion" in
 			"4" ) exec<<EOM
@@ -25,7 +25,10 @@ EOM
 		
 		if [ $? ]
 		then
-			array link        
+			array -v SECTIONPREFIX link
+			endarr -v SECTIONSUFFIX
+			endobj -v SECTIONSUFFIX
+			endobj -v SECTIONSUFFIX
 			while read my_ip n_ip lq nlq etx 
 			do
 				if [ -n "$n_ip" -a "$etx" != "INFINITE" ]; then
@@ -37,12 +40,14 @@ EOM
 						attr cost $etx
 					endobj
 				fi
+				upload_split_check
 			done 
-			endarr
 		else
 			error=1
 		fi
-	endobj
+
+	SECTIONPREFIX=""
+	SECTIONSUFFIX=""
 		
 	[ "$DEBUG" = "1" ] && echo "exiting olsr_links_common() $error"
 	return $error
@@ -59,15 +64,13 @@ olsr_global_update_common(){
 	local error=0
 
 
-	UPLOADPREFIXLOCAL="?do=globalUpdate"
+	UPLOADPREFIX="?do=globalUpdate"
 
-	UPLOADPREFIX=""
- 	[ -n "$updateintervalglobal" ] && UPLOADPREFIX="$UPLOADPREFIXLOCAL&updateIntervalGlobal=$updateintervalglobal"
-	UPLOADPREFIX="$UPLOADPREFIX&node="
-	array -v UPLOADPREFIX
-	UPLOADSUFFIX=""
-	endarr -v UPLOADSUFFIX
-	rem_trailing_comma -v UPLOADSUFFIX
+ 	[ -n "$updateintervalglobal" ] && UPLOADPREFIX="$UPLOADPREFIX&updateIntervalGlobal=$updateintervalglobal"
+	SECTIONPREFIX="&node="
+	array -v SECTIONPREFIX
+	endarr -v SECTIONSUFFIX
+	rem_trailing_comma -v SECTIONSUFFIX
 
 	cp /var/etc/hosts.olsr $TEMP_DIR
 	cp /var/run/latlon.js $TEMP_DIR
@@ -137,18 +140,16 @@ EOF
 			print "obj;array iface;obj;attr ipv4Addr "m";endobj;"mid[m]"endarr;endobj;upload_split_check;"
 			}
 		
-		print "upload"
-		print "UPLOADPREFIX=\"\""
-		print "UPLOADPREFIX=\"\$UPLOADPREFIXLOCAL&link=\""
-		print "obj -v UPLOADPREFIX"
-		print "attr -v UPLOADPREFIX rp olsr"
-		print "attr -v UPLOADPREFIX metricType $metrictype"
-		print "attr -v UPLOADPREFIX ipv $ipversion"
-		print "array -v UPLOADPREFIX link"
-		print "UPLOADSUFFIX=\"\""
-		print "endarr -v UPLOADSUFFIX"
-		print "endobj -v UPLOADSUFFIX"
-		print "rem_trailing_comma -v UPLOADSUFFIX"
+		print "SECTIONPREFIX=\"\""
+		print "SECTIONPREFIX=\"&link=\""
+		print "obj -v SECTIONPREFIX"
+		print "attr -v SECTIONPREFIX rp olsr"
+		print "attr -v SECTIONPREFIX metricType $metrictype"
+		print "attr -v SECTIONPREFIX ipv $ipversion"
+		print "array -v SECTIONPREFIX link"
+		print "SECTIONSUFFIX=\"\""
+		print "endarr -v SECTIONSUFFIX"
+		print "endobj -v SECTIONSUFFIX"
 
 		lc=0
 		for ( l in link ){

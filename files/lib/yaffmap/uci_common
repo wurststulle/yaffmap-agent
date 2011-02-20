@@ -310,23 +310,21 @@ network_interfaces(){
 	uploadprefixglobal=$UPLOADPREFIX
 	uploadsuffixglobal=$UPLOADSUFFIX
 
-	UPLOADSUFFIX=""
-	endarr -v UPLOADSUFFIX
-	rem_trailing_comma -v UPLOADSUFFIX
-	UPLOADSUFFIX="$UPLOADSUFFIX$uploadsuffixglobal"
+	SECTIONSUFFIX=""
+	endarr -v SECTIONSUFFIX
 
-	array -v UPLOADPREFIX wlDevice
+	array -v SECTIONPREFIX wlDevice
 		config_load wireless
 		config_foreach make_dev_list wifi-device
 		for wd in $DEVICES
 		do
 			wifi_device_attributes $wd
 		done
-	upload
+	upload_split_check $DATA
 	error=$?
 
-	UPLOADPREFIX="$uploadprefixglobal"
-	array -v UPLOADPREFIX wiredIface
+	SECTIONPREFIX=""
+	array -v SECTIONPREFIX wiredIface
 		config_load network
 		DEVICES=""
 		config_foreach make_dev_list interface
@@ -335,11 +333,11 @@ network_interfaces(){
 			network_iface $int
 		done
 	
-	upload
+	upload_split_check $DATA
 	[ "$error" -eq 0 ] && error=$?
 	
-	UPLOADPREFIX=$uploadprefixglobal
-	UPLOADSUFFIX=$uploadsuffixglobal
+	SECTIONPREFIX=""
+	SECTIONSUFFIX=""
 
 	[ "$UPLOADSPLITCHECKERROR" -eq 1 ] && error=1
 	[ "$error" -eq 1 ] &&	ERROR_REASON="$ERROR_REASON network_interfaces"
@@ -392,13 +390,8 @@ rf_links(){
 	
 	local error=0 uploadprefixglobal uploadsuffixglobal
 	
-	uploadprefixglobal=$UPLOADPREFIX
-	array -v UPLOADPREFIX rfNeighbour
-	uploadsuffixglobal=$UPLOADSUFFIX
-	UPLOADSUFFIX=""
-	endarr -v UPLOADSUFFIX
-	rem_trailing_comma -v UPLOADSUFFIX
-	UPLOADSUFFIX="$UPLOADSUFFIX$uploadsuffixglobal"
+	array -v SECTIONPREFIX rfNeighbour
+	endarr -v SECTIONSUFFIX
 	
 	DEVICES=""
 	config_load wireless
@@ -408,10 +401,10 @@ rf_links(){
 		rflinks_wifi_device $wd
 	done
 
-	upload
 	error=$?
-	UPLOADPREFIX=$uploadprefixglobal
-	UPLOADSUFFIX=$uploadsuffixglobal
+
+	SECTIONPREFIX=""
+	SECTIONSUFFIX=""
 
 	[ "$UPLOADSPLITCHECKERROR" -eq 1 ]	&& error=1
 	[ "$error" -eq 1 ] && ERROR_REASON="$ERROR_REASON rf_links"

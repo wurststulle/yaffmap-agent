@@ -35,6 +35,8 @@ upload(){
 
 	if [ "$PRETEND_UPLOAD" = "1" ]
 	then
+		length=${#txurl}
+		echo "\$TXURL is $length long"
 		echo "This would have been transmitted without '-p':"
 		echo "$txurl"
 	else
@@ -68,7 +70,6 @@ upload(){
 		fi
 	fi
 
-
 	DATA=""
 	UPLOADSPLITCHECKERROR=""
 	[ "$DEBUG" = "1" ] && echo "exiting upload() $error"
@@ -77,15 +78,54 @@ upload(){
 
 upload_split_check(){
 #	[ "$DEBUG" = "1" ] && echo "entering upload_split_check()"
-	local error=0
-	
-	length=${#DATA}
-	if [ $length -gt 1500 ]
+	local error=0 option=$1
+
+	fill_txdata(){
+		TXDATA="$TXDATA$OLDSECTIONPREFIX$TXBUFFER"
+		rem_trailing_comma -v TXDATA
+		TXDATA="$TXDATA$OLDSECTIONSUFFIX"
+		[ -z "$OLDSECTIONSUFFIX" -a -n "$( echo $TXBUFFER | egrep -E '\,$')" ]  && TXDATA="$TXDATA,"
+	}
+
+	if [ "$OLDSECTIONPREFIX" != "$SECTIONPREFIX" -o "$option" == "-p" ]
 	then
+		fill_txdata
+		if [ "$DEBUG" = "1" ]
+		then
+			echo "DATA=$DATA"
+			echo "TXBUFFER=$TXBUFFER"
+			echo "TXDATA=$TXDATA"
+		fi
+		TXBUFFER=""
+	else
+		TXBUFFER="$TXBUFFER$DATA"
+		if [ "$DEBUG" = "1" ]
+		then
+			echo "DATA=$DATA"
+			echo "TXDATA=$TXDATA"
+			echo "TXBUFFER=$TXBUFFER"
+		fi
+		DATA=""
+		
+		length=${#TXBUFFER}
+		if [ $length -gt 1500 ]
+		then
+			fill_txdata
+		fi
+	fi
+
+	length=${#TXDATA}
+	if [ $length -gt 1500 -o "$option" == "-p" ]
+	then
+		DATA=$TXDATA
 		upload
 		error=$?
-		DATA=""
+		TXBUFFER="$DATA"
+		TXDATA=""
 	fi
+	
+	OLDSECTIONPREFIX=$SECTIONPREFIX
+	OLDSECTIONSUFFIX=$SECTIONSUFFIX
 	
 	if [ "$UPLOADSPLITCHECKERROR" -eq 1 ] 
 	then
@@ -98,17 +138,22 @@ upload_split_check(){
 }
 
 rp_links(){
-	local error=0
+	local error=0 tmpsuff tmppref
 	
-	obj neighbour
+	obj -v SECTIONPREFIX neighbour
 		for rp in $ROUTINGPROTOCOLS
 		do
+			tmpsuff=$SECTIONSUFFIX
+			tmppref=$SECTIONPREFIX
 			${rp}_links || error=1
+			SECTIONSUFFIX=$tmpsuff
+			SECTIONPREFIX=$tmppref
 		done
-	endobj
 
-	upload
 	[ $error -eq 0 ] && error=$?
+	
+	SECTIONSUFFIX=""
+	SECTIONPREFIX=""
 
 	[ "$DEBUG" = "1" ] && echo "exiting rp_links() $error"	
 	return $error
@@ -156,16 +201,9 @@ update(){
 	then
 		[ "$QUIET" = "0" ] && echo "NodeID is 0 or empty. Retrieving a new one"
 		getid
-		update_mode="full"
+		update_mode="node"
 	fi
 
-	UPLOADPREFIX="?do=update&node="
-	obj -v UPLOADPREFIX
-		attr -v UPLOADPREFIX id $id
-	
-	endobj -v UPLOADSUFFIX
-	rem_trailing_comma -v UPLOADSUFFIX
-	
 	case $update_mode in
 		links)
 			rp_links || error=1
@@ -178,6 +216,12 @@ update(){
 			check_new_release
 			;;
 		* )	
+			UPLOADPREFIX="?do=update&node="
+			obj -v UPLOADPREFIX
+				attr -v UPLOADPREFIX id $id
+	
+			endobj -v UPLOADSUFFIX
+			rem_trailing_comma -v UPLOADSUFFIX
 			load_node_data	
 			attr updateIntervalNode $nodeinterval
 			attr updateIntervalLink $linksinterval
@@ -188,11 +232,15 @@ update(){
 			[ "$isHna" -eq 1 ] && attr isHna true || attr isHna false
 			[ -n "$defGateway" ] && attr defGateway $defGateway
 			[ -n "$agentRelease" ] && attr agentRelease $agentRelease
-			if ! upload; then error=1; ERROR_REASON="$ERROR_REASON node_update"; fi
+			if ! upload_split_check; then error=1; ERROR_REASON="$ERROR_REASON node_update"; fi
+
 
 			network_interfaces || error=1
 			rp_links || error=1
 			rf_links || error=1
+			
+			if ! upload_split_check -p; then error=1; ERROR_REASON="$ERROR_REASON node_update"; fi
+			
 			;;
 	esac
 
