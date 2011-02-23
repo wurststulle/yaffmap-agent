@@ -258,20 +258,24 @@ check_new_release(){
 	local txurl rel
 	local started="false"
 	
-	rel=$(cat /lib/yaffmap/release.txt)
-	txurl="${URL}?do=getUpgrade&rel=${rel}&tree=devel&version=uci"
+	if [ "$FORCE" != "1" ]
+	then
+		rel="&rel=$(cat /lib/yaffmap/release.txt)"
+	fi
+	
+	txurl="${URL}?do=getUpgrade${rel}&tree=devel&version=uci"
 	upload $txurl
 	
-	if [ -n "$SERVER_RESPONSE" ]
+	if [ -n "$SERVER_RESPONSE" -o "$FORCE" = "1" ]
 	then
 		eval $SERVER_RESPONSE #this creates the variable "url"
 		echo "New Map Agent release found, attempting to upgrade!"
+		upgrade $url	
 	fi
 
-	upgrade $url	
 }
 
-local error=0 usage=0 noerrmsg=0
+local error=0 usage=0 noerrmsg=0 debpar=0
 args=$@
 
 for s in $@
@@ -292,6 +296,9 @@ do
 		"-du")
 			UPLOAD_DEBUG_INFO=1
 			;;
+		"-f")
+			FORCE=1
+			;;
 	esac
 	args=$( echo $args | sed 's/$s//g' )	
 done
@@ -311,10 +318,11 @@ case $( echo $args | cut -d" " -f1 ) in
 		update $2
 		error=$?
 		;;
-	restart)	
-		$0 stop
+	restart)
+		[ "$UPLOAD_DEBUG_INFO" = "1" ] && debpar="-du"
+		$0 stop $debpar
 		[ $? -eq 1 ] && error=1
-		$0 start
+		$0 start $debpar
 		[ $? -eq 1 ] && error=1
 		;;
 	check_new_release)
@@ -329,6 +337,8 @@ case $( echo $args | cut -d" " -f1 ) in
 			echo "	-v		show debug output"
 			echo "	-q		do not show show success or error messages"
 			echo "	-p		data is printed on screen instead of being uploaded"
+			echo "	-f		Force"
+			echo "	-du		Upload debug information in case of errors during update"
 			echo "	--getidip	use also IP address to retrieve nodeID from map server"
 			noerrmsg=1
 		;;
