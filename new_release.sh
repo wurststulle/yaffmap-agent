@@ -36,7 +36,7 @@ announce(){
 		echo 
 		echo "Error Text: $errormessage"
 		echo 
-		echo "Transmit String: $txurl"
+		echo "Transmit String: $ANNOUNCE_URL?do=newAgentReleaseWithFile&tree=$TREE&version=$VERSION&release=$RELEASE$ishead"
 		echo
 		check_error 1 "upload to webserver"
 	fi
