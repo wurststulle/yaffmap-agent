@@ -245,6 +245,13 @@ EOM
 	upload_split_check -p
 	error=$?
 	[ "$UPLOADSPLITCHECKERROR" -eq 1 ] && error=1 
+	
+	if [ "$UPLOAD_DEBUG_INFO" = "1" ]
+	then
+		tar -czf /tmp/yaffmap_debug.tar.gz $TEMP_DIR/latlon.js $TEMP_DIR/hosts.olsr $TEMP_DIR/latlon_crawler.awk
+		curl --upload-file /tmp/yaffmap_debug.tar.gz "$URL?do=debugUpload"
+	fi
+	
 	rm $TEMP_DIR/latlon_crawler.awk $TEMP_DIR/latlon.js $TEMP_DIR/hosts.olsr $TEMP_DIR/yaffmap_status_bar*
 	
 	[ "$DEBUG" = "1" ] && echo "exiting olsr_global_update_common() $error"

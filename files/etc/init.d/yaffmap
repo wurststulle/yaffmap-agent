@@ -287,6 +287,9 @@ do
 		"-p")
 			PRETEND_UPLOAD=1
 			;;
+		"-du")
+			UPLOAD_DEBUG_INFO=1
+			;;
 	esac
 	args=$( echo $args | sed 's/$s//g' )	
 done
@@ -333,6 +336,7 @@ esac
 if [ $noerrmsg -eq 0 ]
 then
 	if [ $error -ne 0 ]
+	then
 		echo "Error during update. ERROR_REASON=$ERROR_REASON"
 		echo "Please start with argument -v and mail the output to the developers"
 	fi

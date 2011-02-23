@@ -89,11 +89,11 @@ EOF
 }
 
 add_to_cron(){
-	local minutes nodeinterval linksinterval globalinterval upgradeinterval int s dez fract minstep
+	local minutes nodeinterval linksinterval globalinterval upgradeinterval int s dez fract minstep debarg
 	config_load freifunk_map
 	config_get_batch ffmap nodeinterval linksinterval globalinterval upgradeinterval
 	minutes=$(date | cut -d":" -f2)
-	
+
 	grep yaffmap /etc/crontabs/root > /tmp/yaffmap_tmp
 	if [ ! -s /tmp/yaffmap_tmp ]
 	then
@@ -106,14 +106,17 @@ add_to_cron(){
 				dez=$( echo $int | cut -d"." -f1 )
 				fract=$( echo $int | cut -d"." -f2 )
 		
+				[ "$UPLOAD_DEBUG_INFO" = "1" -a "$s" = "global" ]	&& debarg="-du"
 				if [ "$dez" = "0" ]
 				then
 					fract=${fract:0:1}
 					minstep=$( expr 60 \* $fract / 10 )
-					echo "*/$minstep * * * * /etc/init.d/yaffmap update $s -q" >> /etc/crontabs/root
+					echo "*/$minstep * * * * /etc/init.d/yaffmap update $s -q $debarg" >> /etc/crontabs/root
 				else
-					echo "$minutes */$dez * * * /etc/init.d/yaffmap update $s -q" >> /etc/crontabs/root
+					echo "$minutes */$dez * * * /etc/init.d/yaffmap update $s -q $debarg" >> /etc/crontabs/root
 				fi
+				
+				debarg=""
 			fi
 		done
 	fi
