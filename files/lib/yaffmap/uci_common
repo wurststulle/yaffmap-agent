@@ -83,6 +83,7 @@ config 'node' 'ffmap'
 	option	'linksinterval' '0.1'
 	option	'upgradeinterval' '12'
 	option	'timeout' '5'
+	option	'upgradetree'	'devel'
 
 EOF
 	fi
@@ -134,7 +135,7 @@ saveid(){
 
 load_node_data(){
 	config_load freifunk_map
-	config_get_batch ffmap nodeinterval linksinterval timeout id
+	config_get_batch ffmap nodeinterval linksinterval timeout id upgradetree
 	config_load olsrd
 	get_gps_coords(){
 		local config=$1
@@ -150,6 +151,7 @@ load_node_data(){
 	fi
 	
 	agentRelease="$(cat /lib/yaffmap/release.txt)"
+	agentVersion="uci"
 }
 
 

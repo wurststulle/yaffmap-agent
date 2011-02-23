@@ -236,6 +236,8 @@ update(){
 			[ "$isHna" -eq 1 ] && attr isHna true || attr isHna false
 			[ -n "$defGateway" ] && attr defGateway $defGateway
 			[ -n "$agentRelease" ] && attr agentRelease $agentRelease
+			[ -n "$agentVersion" ] && attr version $agentVersion
+			[ -n "$upgradetree" ] && attr upgradeTree $upgradetree
 			if ! upload_split_check; then error=1; ERROR_REASON="$ERROR_REASON node_update"; fi
 
 
