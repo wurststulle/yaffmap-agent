@@ -1,5 +1,4 @@
 #!/bin/sh
-. /lib/yaffmap/common_rp_olsr
 
 olsr_links(){
 	[ "$DEBUG" = "1" ] && echo "entering olsr_links()"
