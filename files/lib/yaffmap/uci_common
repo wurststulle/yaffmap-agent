@@ -236,7 +236,7 @@ wifi_device_attributes(){
 			if [ -n "$ifname" ]
 			then
 				obj
-				[ -n "$ssid" ] && attr essid $ssid
+				[ -n "$ssid" ] && attr essid "$ssid"
 				[ -n "$bssid" ] && attr bssid $bssid
 				[ -n "$mode" ] && attr wlMode $mode
 				attr name $ifname

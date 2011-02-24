@@ -178,9 +178,7 @@ getid(){
 		}
 	}' )
 
-	[ "$GETIDIP" = "1" ] && ip_addon="&ipv4Addr=$ip"
-	
-	if upload "$URL?do=getID&macAddr=$macaddr$ip_addon"
+	if upload "$URL?do=getID&macAddr=$macaddr&ipv4Addr=$ip"
 	then
 		eval "$SERVER_RESPONSE"
 		saveid "$id"
@@ -209,7 +207,7 @@ update(){
 	local update_mode="$1" error=0
 
 	load_node_data
-	if [ "$id" = "0" -o -z "$id" ] 
+	if [ "$id" = "0" -o -z "$id" -o "$FORCE_GETID" = "1" ] 
 	then
 		[ "$QUIET" = "0" ] && echo "NodeID is 0 or empty. Retrieving a new one"
 		getid
@@ -292,11 +290,11 @@ do
 		"-v")	
 			DEBUG=1
 			;;
-		"--getidip")
-			GETIDIP=1
-			;;
 		"-p")
 			PRETEND_UPLOAD=1
+			;;
+		"-getid")
+			FORCE_GETID=1
 			;;
 		"-du")
 			UPLOAD_DEBUG_INFO=1
