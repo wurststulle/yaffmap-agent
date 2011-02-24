@@ -74,7 +74,6 @@ upload(){
 	fi
 
 	DATA=""
-	UPLOADSPLITCHECKERROR=""
 	[ "$DEBUG" = "1" ] && echo "exiting upload() $error"
 	return $error
 }
