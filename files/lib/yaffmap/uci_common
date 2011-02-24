@@ -196,23 +196,28 @@ interface_addresses(){
 
 	local config=$1
 	config_get_batch "$config" ifname type aliases
-	macaddr=$( ip addr show dev $ifname | grep -e '.*:.*:.*:.*:.*:.*' | cut -d" " -f 6 )
-	attr macAddr $macaddr
-	ip_params $config
-	[ "$type" = "bridge" ] && attr bridgeName "$ifname"
+	
+	if [ -n "$ifname" ]
+	then
+		macaddr=$( ip addr show dev $ifname | grep -e '.*:.*:.*:.*:.*:.*' | cut -d" " -f 6 )
+		attr macAddr $macaddr
+		ip_params $config
+		[ "$type" = "bridge" ] && attr bridgeName "$ifname"
 
-	[ -n "$aliases" ] && {
-		array ipAlias
-			for a in $aliases
-			do
-				obj
-					config_get ifname "$a" ifname
-					attr name $ifname
-					ip_params $a
-				endobj
-			done
-		endarr
-	}
+		if [ -n "$aliases" ]
+		then
+			array ipAlias
+				for a in $aliases
+				do
+					obj
+						config_get ifname "$a" ifname
+						attr name $ifname
+						ip_params $a
+					endobj
+				done
+			endarr
+		fi
+	fi
 }
 
 
@@ -228,7 +233,9 @@ wifi_device_attributes(){
 		if [ "$device" = "$2" ]
 		then
 			config_get_batch "$config" ssid bssid mode ifname network
-			obj
+			if [ -n "$ifname" ]
+			then
+				obj
 				[ -n "$ssid" ] && attr essid $ssid
 				[ -n "$bssid" ] && attr bssid $bssid
 				[ -n "$mode" ] && attr wlMode $mode
@@ -238,7 +245,8 @@ wifi_device_attributes(){
 				interface_addresses $network
 				config_get type "$network" type
 				[ "$type" != "bridge" ] && WIRELESS_NETWORKS="$WIRELESS_NETWORKS $network"
-			endobj
+				endobj		
+			fi
 		fi
 	} 
 
@@ -363,20 +371,23 @@ rf_links(){
 		if [ "$device" = "$2" ]
 		then
 			config_get ifname $config ifname
-			macaddr=$( ip addr show dev $ifname | grep -e '.*:.*:.*:.*:.*:.*' | cut -d" " -f 6 )
-			case $3 in
-				atheros)	
-					temp=$( wlanconfig $ifname list sta | grep -v ADDR | grep -i -v $macaddr | awk -v source=$macaddr '{print "obj; attr sMac "source"; attr dMac "$1"; attr rssi "$6"; endobj;upload_split_check"}' ) 
-					eval "$temp"
-					;;
-				mac80211)	
-					temp=$( iw $ifname station dump | awk -v source=$macaddr '{
-						if($1~/Station/) print "obj;attr sMac "source";attr dMac "$2";";
-						if($1~/signal/) print "attr rssi "$2";";
-						if($0~/tx bitrate/) print "attr txRate "$3";endobj;upload_split_check;"}' )
-					eval "$temp"
-					;;
-			esac
+			if [ -n "$ifname" ]
+			then
+				macaddr=$( ip addr show dev $ifname | grep -e '.*:.*:.*:.*:.*:.*' | cut -d" " -f 6 )
+				case $3 in
+					atheros)	
+						temp=$( wlanconfig $ifname list sta | grep -v ADDR | grep -i -v $macaddr | awk -v source=$macaddr '{print "obj; attr sMac "source"; attr dMac "$1"; attr rssi "$6"; endobj;upload_split_check"}' ) 
+						eval "$temp"
+						;;
+					mac80211)	
+						temp=$( iw $ifname station dump | awk -v source=$macaddr '{
+							if($1~/Station/) print "obj;attr sMac "source";attr dMac "$2";";
+							if($1~/signal/) print "attr rssi "$2";";
+							if($0~/tx bitrate/) print "attr txRate "$3";endobj;upload_split_check;"}' )
+						eval "$temp"
+						;;
+				esac
+			fi
 		fi
 		
 		[ "$UPLOADSPLITCHECKERROR" -eq 1 ] && ERROR_REASON="$ERROR_REASON rflinks_wifi_iface($ifname)"

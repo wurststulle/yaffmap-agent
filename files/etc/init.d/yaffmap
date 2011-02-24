@@ -14,7 +14,7 @@ DEBUG=0
 QUIET=0
 TEMP_DIR=/tmp
 
-for file in $( find /lib/yaffmap/* ! -name *.txt | grep -v \~ )
+for file in $( find /lib/yaffmap/* ! -name "*.txt" | grep -v \~ )
 do
 	. $file
 done
@@ -80,7 +80,7 @@ upload(){
 
 upload_split_check(){
 #	[ "$DEBUG" = "1" ] && echo "entering upload_split_check()"
-	local error=0 option=$1
+	local error=0 option="$1"
 
 	fill_txdata(){
 		TXDATA="$TXDATA$OLDSECTIONPREFIX$TXBUFFER"
@@ -89,7 +89,7 @@ upload_split_check(){
 		[ -z "$OLDSECTIONSUFFIX" -a -n "$( echo $TXBUFFER | egrep -E '\,$')" ]  && TXDATA="$TXDATA,"
 	}
 
-	if [ "$OLDSECTIONPREFIX" != "$SECTIONPREFIX" -o "$option" == "-p" ]
+	if [ "$OLDSECTIONPREFIX" != "$SECTIONPREFIX" -o "\\$option" = "\\-p" ]
 	then
 		fill_txdata
 		if [ "$DEBUG" = "1" ]
@@ -117,7 +117,7 @@ upload_split_check(){
 	fi
 
 	length=${#TXDATA}
-	if [ $length -gt 1500 -o "$option" == "-p" ]
+	if [ $length -gt 1500 -o "\\$option" = "\\-p" ]
 	then
 		DATA=$TXDATA
 		upload
@@ -197,6 +197,15 @@ getid(){
 update(){
 	[ "$DEBUG" = "1" ] &&	echo "entered update() $1"
 	
+	prepare_node_update(){
+		UPLOADPREFIX="?do=update&node="
+		obj -v UPLOADPREFIX
+			attr -v UPLOADPREFIX id $id
+
+		endobj -v UPLOADSUFFIX
+		rem_trailing_comma -v UPLOADSUFFIX
+	}
+	
 	local update_mode="$1" error=0
 
 	load_node_data
@@ -209,8 +218,10 @@ update(){
 
 	case $update_mode in
 		links)
+			prepare_node_update
 			rp_links || error=1
 			rf_links || error=1
+			upload_split_check -p
 			;;
 		global)	
 			olsr_global_update || error=1
@@ -219,12 +230,7 @@ update(){
 			check_new_release
 			;;
 		* )	
-			UPLOADPREFIX="?do=update&node="
-			obj -v UPLOADPREFIX
-				attr -v UPLOADPREFIX id $id
-	
-			endobj -v UPLOADSUFFIX
-			rem_trailing_comma -v UPLOADSUFFIX
+			prepare_node_update
 			load_node_data	
 			attr updateIntervalNode $nodeinterval
 			attr updateIntervalLink $linksinterval
