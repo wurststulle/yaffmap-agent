@@ -250,13 +250,13 @@ EOM
 		
 		if [ "$UPLOAD_DEBUG_INFO" = "1" ]
 		then
-			tar -czf /tmp/yaffmap_debug.tar.gz $TEMP_DIR/latlon.js $TEMP_DIR/hosts.olsr $TEMP_DIR/latlon_crawler.awk 2>/dev/null
 			if [ -n "$(which curl)" ]
 			then
-				[ "$QUIET" != "1" ] && echo "uploading debug files"
+				[ "$QUIET" != "1" -o "$DEBUG" = "1" ] && echo "uploading debug files"
+				tar -czf /tmp/yaffmap_debug.tar.gz $TEMP_DIR/latlon.js $TEMP_DIR/hosts.olsr $TEMP_DIR/latlon_crawler.awk 2>/dev/null
 				curl --upload-file /tmp/yaffmap_debug.tar.gz "$URL?do=debugUpload"
 			else
-				[ "$QUIET" != "1" ] && echo "No CURL found. Not uploading debug information"
+				[ "$QUIET" != "1" -o "$DEBUG" = "1" ] && echo "No CURL found. Not uploading debug information"
 			fi
 		fi
 	fi
