@@ -20,7 +20,7 @@ olsr_links_common(){
 		esac
 		
 		exec<<EOM
-		cat /tmp/yaffmap_olsr_links
+		$( cat /tmp/yaffmap_olsr_links )
 EOM
 		
 		if [ $? ]
