@@ -13,15 +13,15 @@ olsr_links_common(){
 		attr -v SECTIONPREFIX ipv $ipversion 
     
 		case "$ipversion" in
-			"4" ) exec<<EOM
-	    $( wget -T30 -q -O- http://127.0.0.1:2006/links | grep -e ^[1-9] )
-EOM
+			"4" ) wget -T30 -q -O- http://127.0.0.1:2006/links | grep -e ^[1-9] > /tmp/yaffmap_olsr_links
 					;;
-			"6" ) exec<<EOM
-    	$( wget -T30 -q -O- http://[::1]:2006/links | grep -e ^[1-9] )
-EOM
+			"6" ) wget -T30 -q -O- http://[::1]:2006/links | grep -e ^[1-9] > /tmp/yaffmap_olsr_links
 					;;
 		esac
+		
+		exec<<EOM
+		cat /tmp/yaffmap_olsr_links
+EOM
 		
 		if [ $? ]
 		then
