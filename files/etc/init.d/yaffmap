@@ -82,7 +82,7 @@ upload(){
 
 upload_split_check(){
 #	[ "$DEBUG" = "1" ] && echo "entering upload_split_check()"
-	local error=0 option="$1" notfirstsection
+	local error=0 option="$1"
 
 	fill_txdata(){
 		TXDATA="$TXDATA$OLDSECTIONPREFIX$TXBUFFER"
