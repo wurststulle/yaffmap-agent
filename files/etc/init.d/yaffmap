@@ -82,33 +82,34 @@ upload(){
 
 upload_split_check(){
 #	[ "$DEBUG" = "1" ] && echo "entering upload_split_check()"
-	local error=0 option="$1"
+	local error=0 option="$1" notfirstsection
 
 	fill_txdata(){
 		TXDATA="$TXDATA$OLDSECTIONPREFIX$TXBUFFER"
 		rem_trailing_comma -v TXDATA
 		TXDATA="$TXDATA$OLDSECTIONSUFFIX"
 		[ -z "$OLDSECTIONSUFFIX" -a -n "$( echo $TXBUFFER | egrep -E '\,$')" ]  && TXDATA="$TXDATA,"
+		
+		if [ "$DEBUG" = "1" ]
+		then
+			echo "filled TXDATA"
+			echo "DATA=$DATA"
+			echo "TXBUFFER=$TXBUFFER"
+			echo "TXDATA=$TXDATA"
+		fi
 	}
 
-	if [ "$OLDSECTIONPREFIX" != "$SECTIONPREFIX" -o "\\$option" = "\\-p" ]
+	if [ "$notfirstsection" -eq 1 ] && [ "$OLDSECTIONPREFIX" != "$SECTIONPREFIX" -o "\\$option" = "\\-p"  ]
 	then
+		[ "$DEBUG" = "1" ] && echo " OLDSECTIONPREFIX ($OLDSECTIONPREFIX) != SECTIONPREFIX ($SECTIONPREFIX) "
 		fill_txdata
-		if [ "$DEBUG" = "1" ]
-		then
-			echo "DATA=$DATA"
-			echo "TXBUFFER=$TXBUFFER"
-			echo "TXDATA=$TXDATA"
-		fi
-		TXBUFFER=""
+		TXBUFFER="$DATA"
+		DATA=""
 	else
+		[ -z "$notfirstsection" -a -z "$OLDSECTIONPREFIX" ] && notfirstsection=1
+	
+		[ "$DEBUG" = "1" ] && echo " adding DATA to TXBUFFER"
 		TXBUFFER="$TXBUFFER$DATA"
-		if [ "$DEBUG" = "1" ]
-		then
-			echo "DATA=$DATA"
-			echo "TXDATA=$TXDATA"
-			echo "TXBUFFER=$TXBUFFER"
-		fi
 		DATA=""
 		
 		length=${#TXBUFFER}
@@ -243,8 +244,8 @@ update(){
 			[ -n "$agentRelease" ] && attr agentRelease $agentRelease
 			[ -n "$agentVersion" ] && attr version $agentVersion
 			[ -n "$upgradetree" ] && attr upgradeTree $upgradetree
-			if ! upload_split_check; then error=1; ERROR_REASON="$ERROR_REASON node_update"; fi
-
+			upload_split_check
+			error=$?
 
 			network_interfaces || error=1
 			rp_links || error=1
