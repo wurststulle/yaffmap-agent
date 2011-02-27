@@ -60,6 +60,7 @@ olsr_global_update_common(){
 	function update_status_bar(text)
 	{
 		if ( quiet != 1 ) {
+			++curlines
 			barlength=25
 			percent=curlines/datalines*100
 			printf("%s dataset %s of %s : %4.2f%%  ", text, curlines, datalines, percent ) > "/dev/stderr"
@@ -70,7 +71,6 @@ olsr_global_update_common(){
 			for (i=1; i<=dots; i++ )
 				printf "." > "/dev/stderr"
 			printf "\r" > "/dev/stderr"
-			++curlines
 		}
 	}
 	
@@ -140,6 +140,7 @@ EOF
 	' $TEMP_DIR/hosts.olsr >> $TEMP_DIR/latlon_crawler.awk
 
 	cat <<EOM >> $TEMP_DIR/latlon_crawler.awk
+	print "datalines=\"\$( cat /tmp/yaffmap_datalines)\""
 	quiet=$QUIET
 	datalines=$datalines
 	datalinescorrected=0
@@ -178,13 +179,13 @@ EOM
 			}
 			gsub("Node(","")
 			gsub("Self(","")
-			print "obj;attr name "\$6";attr latitude "\$2";attr longitude "\$3";attr defGateway "\$5";"
+			printf ("obj;attr name %s;attr latitude %s;attr longitude %s;attr defGateway %s;",\$6,\$2,\$3,\$5)
 			if (\$4=="1") {
-				print "attr isHna true;"
+				printf "attr isHna true;"
 			}else{
-				print "attr isHna false;"
+				printf "attr isHna false;"
 			}
-			print "array iface;obj;attr ipv4Addr "\$1";endobj;"mid[\$1]"endarr;endobj;upload_split_check;update_status_bar Uploading",curlines,datalines";"
+			print "array iface;obj;attr ipv4Addr "\$1";endobj;"mid[\$1]"endarr;endobj;upload_split_check;update_status_bar Uploading",curlines,"\$datalines;"
 			update_status_bar("Processing")
 			delete mid[\$1]
 			hostplussuffix=\$6"$suffix"
@@ -193,6 +194,7 @@ EOM
 				if ( separate[1] == hostplussuffix )
 					delete hosts_names[s]
 			}
+			++nc
 			next
 		}
 
@@ -206,39 +208,46 @@ EOM
 	END{
 		for ( s in hosts_names ) {
 			split( s, separate, "," )
-			print "obj;attr name "separate[1]";array iface;obj;attr ipv4Addr "separate[2]";endobj;"mid[separate[2]]"endarr;endobj;upload_split_check;update_status_bar Uploading",curlines,datalines";"
+			print "obj;attr name "separate[1]";array iface;obj;attr ipv4Addr "separate[2]";endobj;"mid[separate[2]]"endarr;endobj;upload_split_check;update_status_bar Uploading",curlines,"\$datalines;"
 			update_status_bar("Processing")
 			delete mid[separate[2]]
+			++nc
 		}
 
 		for ( m in mid ){
-			print "obj;array iface;obj;attr ipv4Addr "m";endobj;"mid[m]"endarr;endobj;upload_split_check;update_status_bar Uploading",curlines,datalines";"
+			print "obj;array iface;obj;attr ipv4Addr "m";endobj;"mid[m]"endarr;endobj;upload_split_check;update_status_bar Uploading",curlines,"\$datalines;"
 			update_status_bar("Processing")
+			++nc
 			}
 		
-		print "SECTIONPREFIX=\"\""
-		print "SECTIONPREFIX=\"&link=\""
-		print "obj -v SECTIONPREFIX"
-		print "attr -v SECTIONPREFIX rp olsr"
-		print "attr -v SECTIONPREFIX metricType $metrictype"
-		print "attr -v SECTIONPREFIX ipv $ipversion"
-		print "array -v SECTIONPREFIX link"
-		print "SECTIONSUFFIX=\"\""
-		print "endarr -v SECTIONSUFFIX"
-		print "endobj -v SECTIONSUFFIX"
 
 		lc=0
 		for ( l in link ){
 			split(l,line,";")
-			print "obj;attr sAddr "line[1]";attr dAddr "line[2]";attr rx "line[3]";attr tx "line[4]";attr cost "line[5]";endobj;upload_split_check;update_status_bar Uploading",curlines,datalines";"
+			print "obj;attr sAddr "line[1]";attr dAddr "line[2]";attr rx "line[3]";attr tx "line[4]";attr cost "line[5]";endobj;upload_split_check;update_status_bar Uploading",curlines,"\$datalines;"
 			update_status_bar("Processing")
 			++lc
 		}
 		
-		print "" > "/dev/stderr"
-		print "echo; echo \"links uploaded: "lc"\""
+		print lc + nc > "/tmp/yaffmap_datalines"
+
+		if ( quiet != 1 ) { 
+			print "\n" lc " links and " nc " nodes processed." > "/dev/stderr" 
+			print "echo"
+		}
 	}
 EOM
+
+	SECTIONPREFIX=""
+	SECTIONPREFIX="&link="
+	obj -v SECTIONPREFIX
+	attr -v SECTIONPREFIX rp olsr
+	attr -v SECTIONPREFIX metricType $metrictype
+	attr -v SECTIONPREFIX ipv $ipversion
+	array -v SECTIONPREFIX link
+	SECTIONSUFFIX=""
+	endarr -v SECTIONSUFFIX
+	endobj -v SECTIONSUFFIX
 
 	eval "$( $TEMP_DIR/latlon_crawler.awk $TEMP_DIR/latlon.js )" 
 
@@ -261,7 +270,7 @@ EOM
 		fi
 	fi
 	
-	rm $TEMP_DIR/latlon_crawler.awk $TEMP_DIR/latlon.js $TEMP_DIR/hosts.olsr $TEMP_DIR/yaffmap_status_bar*
+	rm $TEMP_DIR/latlon_crawler.awk $TEMP_DIR/latlon.js $TEMP_DIR/hosts.olsr $TEMP_DIR/yaffmap_status_bar* $TEMP_DIR/yaffmap_datalines
 	
 	[ "$DEBUG" = "1" ] && echo "exiting olsr_global_update_common() $error"
 	return $error
