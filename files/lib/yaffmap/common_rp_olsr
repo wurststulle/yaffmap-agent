@@ -151,6 +151,19 @@ EOM
 	cat $TEMP_DIR/yaffmap_status_bar.awk >> $TEMP_DIR/latlon_crawler.awk
 
 	cat <<EOM >> $TEMP_DIR/latlon_crawler.awk
+	
+	function is_ip(input)
+	{
+		if ( input~/^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ )
+		{
+			ret = 1
+		} else {
+			ret=0
+		}
+		return ret
+	}
+
+	######### MAIN
 	{
 		gsub(");","")
 		gsub(","," ")
@@ -179,22 +192,26 @@ EOM
 			}
 			gsub("Node(","")
 			gsub("Self(","")
-			printf ("obj;attr name %s;attr latitude %s;attr longitude %s;attr defGateway %s;",\$6,\$2,\$3,\$5)
-			if (\$4=="1") {
-				printf "attr isHna true;"
-			}else{
-				printf "attr isHna false;"
+
+			if ( is_ip($1) )
+			{
+				printf ("obj;attr name %s;attr latitude %s;attr longitude %s;attr defGateway %s;",\$6,\$2,\$3,\$5)
+				if (\$4=="1") {
+					printf "attr isHna true;"
+				}else{
+					printf "attr isHna false;"
+				}
+				print "array iface;obj;attr ipv4Addr "\$1";endobj;"mid[\$1]"endarr;endobj;upload_split_check;update_status_bar Uploading",curlines,"\$datalines;"
+				update_status_bar("Processing")
+				delete mid[\$1]
+				hostplussuffix=\$6"$suffix"
+				for ( s in hosts_names ) {
+					split( s, separate, "," )
+					if ( separate[1] == hostplussuffix )
+						delete hosts_names[s]
+				}
+				++nc
 			}
-			print "array iface;obj;attr ipv4Addr "\$1";endobj;"mid[\$1]"endarr;endobj;upload_split_check;update_status_bar Uploading",curlines,"\$datalines;"
-			update_status_bar("Processing")
-			delete mid[\$1]
-			hostplussuffix=\$6"$suffix"
-			for ( s in hosts_names ) {
-				split( s, separate, "," )
-				if ( separate[1] == hostplussuffix )
-					delete hosts_names[s]
-			}
-			++nc
 			next
 		}
 
@@ -218,15 +235,18 @@ EOM
 			print "obj;array iface;obj;attr ipv4Addr "m";endobj;"mid[m]"endarr;endobj;upload_split_check;update_status_bar Uploading",curlines,"\$datalines;"
 			update_status_bar("Processing")
 			++nc
-			}
+		}
 		
 
 		lc=0
 		for ( l in link ){
 			split(l,line,";")
-			print "obj;attr sAddr "line[1]";attr dAddr "line[2]";attr rx "line[3]";attr tx "line[4]";attr cost "line[5]";endobj;upload_split_check;update_status_bar Uploading",curlines,"\$datalines;"
-			update_status_bar("Processing")
-			++lc
+			if ( is_ip(line[1]) && is_ip(line[2]) )
+			{
+				print "obj;attr sAddr "line[1]";attr dAddr "line[2]";attr rx "line[3]";attr tx "line[4]";attr cost "line[5]";endobj;upload_split_check;update_status_bar Uploading",curlines,"\$datalines;"
+				update_status_bar("Processing")
+				++lc
+			}
 		}
 		
 		print lc + nc > "/tmp/yaffmap_datalines"
