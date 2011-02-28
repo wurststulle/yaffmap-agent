@@ -193,7 +193,7 @@ EOM
 			gsub("Node(","")
 			gsub("Self(","")
 
-			if ( is_ip($1) )
+			if ( is_ip(\$1) )
 			{
 				printf ("obj;attr name %s;attr latitude %s;attr longitude %s;attr defGateway %s;",\$6,\$2,\$3,\$5)
 				if (\$4=="1") {
