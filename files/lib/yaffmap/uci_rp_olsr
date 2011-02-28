@@ -24,7 +24,7 @@ olsr_global_update(){
 	local latlonfile hostsfile
 
 	updateintervalglobal=$( uci get freifunk_map.ffmap.globalinterval 2>/dev/null)
-	[ -z "$updateintervalglobal" ] && updateintervalglobal=0
+	[ "$FORCE" = "1" ] && [ -z "$updateintervalglobal" ] && updateintervalglobal=0
 
 	get_dnssuffix(){
 		config_get suffix "$1" suffix
@@ -32,7 +32,7 @@ olsr_global_update(){
 	config_load olsrd
 	config_foreach get_dnssuffix LoadPlugin
 
-	if [ -z "$updateintervalglobal" -o "$FORCE" != "1"]
+	if [ -z "$updateintervalglobal" ]
 	then
 		echo "No olsr global update without globalinterval"
 		error=1
