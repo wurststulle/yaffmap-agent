@@ -237,6 +237,16 @@ EOM
 			++nc
 		}
 		
+		print "SECTIONPREFIX=\"\""
+		print "SECTIONPREFIX=\"&link=\""
+		print "obj -v SECTIONPREFIX"
+		print "attr -v SECTIONPREFIX rp olsr"
+		print "attr -v SECTIONPREFIX metricType $metrictype"
+		print "attr -v SECTIONPREFIX ipv $ipversion"
+		print "array -v SECTIONPREFIX link"
+		print "SECTIONSUFFIX=\"\""
+		print "endarr -v SECTIONSUFFIX"
+		print "endobj -v SECTIONSUFFIX"
 
 		lc=0
 		for ( l in link ){
@@ -257,17 +267,6 @@ EOM
 		}
 	}
 EOM
-
-	SECTIONPREFIX=""
-	SECTIONPREFIX="&link="
-	obj -v SECTIONPREFIX
-	attr -v SECTIONPREFIX rp olsr
-	attr -v SECTIONPREFIX metricType $metrictype
-	attr -v SECTIONPREFIX ipv $ipversion
-	array -v SECTIONPREFIX link
-	SECTIONSUFFIX=""
-	endarr -v SECTIONSUFFIX
-	endobj -v SECTIONSUFFIX
 
 	eval "$( $TEMP_DIR/latlon_crawler.awk $TEMP_DIR/latlon.js )" 
 
