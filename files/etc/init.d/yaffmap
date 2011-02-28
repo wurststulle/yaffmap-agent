@@ -61,7 +61,7 @@ upload(){
 			echo "update returnstring: $SERVER_RESPONSE"
 		fi
 
-		if [ ! "$errorcode" = "0" ] 
+		if [ "$errorcode" = "1" ] 
 		then
 			echo "Map Server returned error"
 			echo 
@@ -72,6 +72,13 @@ upload(){
 			echo "Transmit String: $txurl"
 			echo
 			error=1
+		fi
+		
+		if [ "$errorcode" = "2" ]
+		then
+			echo "Node ID has not been valid. Server sent a new/correct one."
+			getid
+			NODEIDINVALID=1
 		fi
 	fi
 
@@ -181,7 +188,7 @@ getid(){
 		}
 	}' )
 
-	if upload "$URL?do=getID&macAddr=$macaddr&ipv4Addr=$ip"
+	if upload "$URL?do=getID&addressSet=[{\"macAddr\":\"$macaddr\",\"ipv4Addr\":\"$ip\"}]"
 	then
 		eval "$SERVER_RESPONSE"
 		saveid "$id"
@@ -200,6 +207,7 @@ update(){
 	
 	prepare_node_update(){
 		UPLOADPREFIX="?do=update&node="
+		UPLOADSUFFIX=""
 		obj -v UPLOADPREFIX
 			attr -v UPLOADPREFIX id $id
 
@@ -244,8 +252,7 @@ update(){
 			[ -n "$agentRelease" ] && attr agentRelease $agentRelease
 			[ -n "$agentVersion" ] && attr version $agentVersion
 			[ -n "$upgradetree" ] && attr upgradeTree $upgradetree
-			upload_split_check
-			error=$?
+			if ! upload_split_check; then error=1; ERROR_REASON="$ERROR_REASON node_update"; fi
 
 			network_interfaces || error=1
 			rp_links || error=1
@@ -253,6 +260,11 @@ update(){
 			
 			if ! upload_split_check -p; then error=1; ERROR_REASON="$ERROR_REASON node_update"; fi
 			
+			if [ "$NODEIDINVALID" = "1" ]
+			then 
+				NODEIDINVALID=0
+				update node
+			fi
 			;;
 	esac
 
