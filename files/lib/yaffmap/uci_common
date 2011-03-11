@@ -139,9 +139,9 @@ load_node_data(){
 	config_load olsrd
 	get_gps_coords(){
 		local config=$1
-		config_get lat $config lat 2>/dev/null
-		config_get lon $config lon 2>/dev/null
-		config_get latlon_file $config latlon_file 2>/dev/null
+		[ -z "$lat" ] && config_get lat $config lat 2>/dev/null
+		[ -z "$lon" ] && config_get lon $config lon 2>/dev/null
+		[ -z "$latlon_file" ] && config_get latlon_file $config latlon_file 2>/dev/null
 	}
 	config_foreach get_gps_coords LoadPlugin
 	
