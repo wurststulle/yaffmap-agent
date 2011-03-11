@@ -27,11 +27,11 @@ olsr_global_update(){
 	[ "$FORCE" = "1" ] && [ -z "$updateintervalglobal" ] && updateintervalglobal=0
 
 	get_dnssuffix(){
-		config_get suffix "$1" suffix
+		[ -z "$suffix" ] && config_get suffix "$1" suffix
 	}
 	config_load olsrd
 	config_foreach get_dnssuffix LoadPlugin
-
+	
 	if [ -z "$updateintervalglobal" ]
 	then
 		echo "No olsr global update without globalinterval"
@@ -45,7 +45,7 @@ olsr_global_update(){
 				ipversion=$( grep IpVersion $olsr_config | cut -d" " -f2 | sed 's/"//g' )
 				latlonfile=$( grep latlon-file $olsr_config | cut -d" " -f3 | sed 's/"//g' )
 				hostsfile=$( grep hosts-file $olsr_config | cut -d" " -f3 | sed 's/"//g' )
-				if ! olsr_global_update_common $updateintervalglobal $suffix $metrictype $ipversion $latlonfile $hostsfile
+				if ! olsr_global_update_common "$updateintervalglobal" "$suffix" "$metrictype" "$ipversion" "$latlonfile" "$hostsfile"
 				then 
 					error=1
 					ERROR_REASON="$ERROR_REASON olsr_global_update_common"
