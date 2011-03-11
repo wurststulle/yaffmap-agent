@@ -120,12 +120,14 @@ add_to_cron(){
 				debarg=""
 			fi
 		done
+		/etc/init.d/cron restart
 	fi
 }
 
 remove_from_cron(){
-	grep -v yaffmap /etc/crontabs/root > /tmp/yaffmap.tmp
-	mv /tmp/yaffmap.tmp /etc/crontabs/root
+	grep -v yaffmap /etc/crontabs/root > /tmp/yaffmap_crontab.tmp
+	mv /tmp/yaffmap_crontab.tmp /etc/crontabs/root
+	/etc/init.d/cron restart
 }
 
 saveid(){
