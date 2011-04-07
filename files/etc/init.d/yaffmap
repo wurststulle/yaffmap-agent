@@ -25,12 +25,12 @@ upload(){
 	
 	local error=0 returnstring errorcode errormessage error=0 txurl
   
-	rem_trailing_comma
+	rem_trailing_comma -v TXDATA
 	if [ -n "$1" ]
 	then
 		txurl="$1"
 	else
-		txurl="$URL$UPLOADPREFIX$DATA$UPLOADSUFFIX"
+		txurl="$URL$UPLOADPREFIX$TXDATA$UPLOADSUFFIX"
 	fi
 
 	txurl="$(echo $txurl|sed 's/ /%20/g' )"
@@ -82,7 +82,7 @@ upload(){
 		fi
 	fi
 
-	DATA=""
+	TXDATA=""
 	[ "$DEBUG" = "1" ] && echo "exiting upload() $error"
 	return $error
 }
@@ -111,7 +111,10 @@ upload_split_check(){
 		[ "$DEBUG" = "1" ] && echo " OLDSECTIONPREFIX ($OLDSECTIONPREFIX) != SECTIONPREFIX ($SECTIONPREFIX) "
 		fill_txdata
 		TXBUFFER="$DATA"
-		DATA=""
+		[ "$TXDATA" = "$OLDSECTIONPREFIX$OLDSECTIONSUFFIX" ] && { 
+			TXDATA=""
+			DATA=""
+		}
 	else
 		[ -z "$notfirstsection" -a -z "$OLDSECTIONPREFIX" ] && notfirstsection=1
 	
@@ -129,7 +132,6 @@ upload_split_check(){
 	length=${#TXDATA}
 	if [ $length -gt 1500 -o "\\$option" = "\\-p" ]
 	then
-		DATA=$TXDATA
 		upload
 		error=$?
 		TXBUFFER="$DATA"
