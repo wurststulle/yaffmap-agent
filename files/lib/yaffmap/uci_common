@@ -14,7 +14,7 @@ make_dev_list(){
 }
 
 migrate_from_old(){
-	local linkinterval upgradeinterval
+	local linkinterval upgradeinterval server
 
 	linkinterval=$(uci get freifunk_map.ffmap.linkinterval 2>/dev/null)
 	
@@ -34,7 +34,16 @@ migrate_from_old(){
 		remove_from_cron
 		add_to_cron
 	fi
+	
+	server=$(uci get freifunk_map.ffmap.server 2>/dev/null)
 
+	if [ -z "$upgradeinterval" ]
+	then
+		uci add_list freifunk_map.ffmap.server=http://wurststulle.dyndns.org/ffmap/build/index.php
+		uci add_list freifunk_map.ffmap.server=http://yaffmap.basicinside.de/index.php
+	fi
+	
+	# add parameter -q to crontab entries
 	grep yaffmap /etc/crontabs/root > /tmp/yaffmap_tmp
 	if [ -s /tmp/yaffmap_tmp ]
 	then
@@ -84,6 +93,8 @@ config 'node' 'ffmap'
 	option	'upgradeinterval' '12'
 	option	'timeout' '5'
 	option	'upgradetree'	'devel'
+	list	'server' 'http://wurststulle.dyndns.org/ffmap/build/index.php'
+	list  'server' 'http://yaffmap.basicinside.de/index.php'
 
 EOF
 	fi
@@ -138,6 +149,22 @@ saveid(){
 load_node_data(){
 	config_load freifunk_map
 	config_get_batch ffmap nodeinterval linksinterval timeout id upgradetree
+	
+	#get the first working server from url list
+	check_working_url(){
+		if [ "$found_working_url" != "1" ]
+		then
+			local l_url="$1"
+			wget -T 30 -q -O/dev/null "$l_url"
+			if [ $? -eq 0  ] 
+			then
+				URL="$l_url"
+				found_working_url="1"
+			fi
+		fi
+	}
+	config_list_foreach ffmap server check_working_url
+	
 	config_load olsrd
 	get_gps_coords(){
 		local config=$1

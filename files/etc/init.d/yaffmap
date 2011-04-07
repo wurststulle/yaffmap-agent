@@ -4,8 +4,6 @@ include /lib/network/
 
 # script revision: $Revision$
 
-URL="http://wurststulle.dyndns.org/ffmap/build/index.php"
-
 #######
 # do not alter variables from here on unless you know what you are doing
 UPLOAD_SUCCESSFUL=1
@@ -13,6 +11,7 @@ PRETEND_UPLOAD=0
 DEBUG=0
 QUIET=0
 TEMP_DIR=/tmp
+URL=""
 
 for file in $( find /lib/yaffmap/* ! -name "*.txt" | grep -v \~ )
 do
@@ -221,6 +220,14 @@ update(){
 	local update_mode="$1" error=0
 
 	load_node_data
+	
+	if [ -z "$URL" ]
+	then
+		error=1
+		ERROR_REASON=" no_server "
+		return $error
+	fi
+	
 	if [ "$id" = "0" -o -z "$id" -o "$FORCE_GETID" = "1" ] 
 	then
 		[ "$QUIET" = "0" ] && echo "NodeID is 0 or empty. Retrieving a new one"
