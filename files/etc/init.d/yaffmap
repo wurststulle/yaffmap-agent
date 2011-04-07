@@ -176,19 +176,20 @@ rp_links(){
 
 getid(){
 	local error=0
-	eval $( ip addr | awk '
-	{
-		if($0~/ether/){
-			ether=$2 }
-		if($0~/inet /){
-		  split($2,tmp,"/")
-		  ip=tmp[1]
-		  if(ether){
+	eval $( 
+	ifconfig | awk '{
+		if ($0~/HWaddr/) {
+			ether=$5}
+		if ($0~/inet addr/) {
+			ip=$2
+			gsub("addr:", "", ip)
+			if(ether){
 				print "macaddr="ether";ip="ip
 				exit
+				}
 			}
-		}
-	}' )
+		}'
+	)
 
 	if upload "$URL?do=getID&addressSet=[{\"macAddr\":\"$macaddr\",\"ipv4Addr\":\"$ip\"}]"
 	then
