@@ -3,7 +3,7 @@
 ANNOUNCE_URL="http://wurststulle.dyndns.org/yaffmap/index.php"
 
 usage(){
-	echo "usage: $0 -t tree -v version -r release"
+	echo "usage: $0 -t tree -v version -r release [-h]"
 	echo "       tree      stable|devel"
 	echo "       version   e.g. uci or fff"
 	echo "       release   e.g. 0.1-1"
