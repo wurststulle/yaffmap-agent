@@ -105,12 +105,16 @@ EOF
 	local ipversion="$4"
 	local latlonfile="$5"
 	local hostsfile="$6"
+	local tree="$7"
+	local release="$8"
+	local version="$9"
 	local error=0
 	local laststatusbarupdate=0
 	
-	UPLOADPREFIX="?do=globalUpdate"
+	UPLOADPREFIX="?do=globalUpdate&release=$release&version=$version&tree=$tree"
 
  	[ -n "$updateintervalglobal" ] && UPLOADPREFIX="$UPLOADPREFIX&updateIntervalGlobal=$updateintervalglobal"
+                   	
 	SECTIONPREFIX="&node="
 	array -v SECTIONPREFIX
 	endarr -v SECTIONSUFFIX

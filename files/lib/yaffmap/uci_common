@@ -54,6 +54,8 @@ migrate_from_old(){
 			add_to_cron
 		fi
 	fi
+	
+	uci del freifunk_map.ffmap.upgradetree 2>/dev/null
 }
 
 upgrade(){
@@ -92,7 +94,6 @@ config 'node' 'ffmap'
 	option	'linksinterval' '0.1'
 	option	'upgradeinterval' '12'
 	option	'timeout' '5'
-	option	'upgradetree'	'devel'
 	list	'server' 'http://wurststulle.dyndns.org/ffmap/build/index.php'
 	list  'server' 'http://yaffmap.basicinside.de/index.php'
 
@@ -150,7 +151,7 @@ load_node_data(){
 	local found_working_url
 	
 	config_load freifunk_map
-	config_get_batch ffmap nodeinterval linksinterval timeout id upgradetree
+	config_get_batch ffmap nodeinterval linksinterval timeout id
 	
 	#get the first working server from url list
 	check_working_url(){
@@ -181,7 +182,8 @@ load_node_data(){
 		eval $(grep Self $latlon_file | sed "s/'//g" | awk '{FS=",";print "isHna="$4";defGateway="$5";"}')
 	fi
 	
-	agentRelease="$(cat /lib/yaffmap/release.txt)"
+	upgradetree=$( cat /lib/yaffmap/release.txt | cut -d":" -f1 )
+	agentRelease=$( cat /lib/yaffmap/release.txt | cut -d":" -f2 )
 	agentVersion="uci"
 }
 

@@ -24,6 +24,10 @@ olsr_global_update(){
 	local latlonfile hostsfile
 
 	updateintervalglobal=$( uci get freifunk_map.ffmap.globalinterval 2>/dev/null)
+	version="uci"
+	tree=$( cat /lib/yaffmap/release.txt | cut -d":" -f1 )
+	release=$( cat /lib/yaffmap/release.txt | cut -d":" -f2 )
+	
 	[ "$FORCE" = "1" ] && [ -z "$updateintervalglobal" ] && updateintervalglobal=0
 
 	get_dnssuffix(){
@@ -45,7 +49,7 @@ olsr_global_update(){
 				ipversion=$( grep IpVersion $olsr_config | cut -d" " -f2 | sed 's/"//g' )
 				latlonfile=$( grep latlon-file $olsr_config | cut -d" " -f3 | sed 's/"//g' )
 				hostsfile=$( grep hosts-file $olsr_config | cut -d" " -f3 | sed 's/"//g' )
-				if ! olsr_global_update_common "$updateintervalglobal" "$suffix" "$metrictype" "$ipversion" "$latlonfile" "$hostsfile"
+				if ! olsr_global_update_common "$updateintervalglobal" "$suffix" "$metrictype" "$ipversion" "$latlonfile" "$hostsfile" "$tree" "$release" "$version"
 				then 
 					error=1
 					ERROR_REASON="$ERROR_REASON olsr_global_update_common"

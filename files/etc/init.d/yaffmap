@@ -2,8 +2,6 @@
 . /etc/functions.sh
 include /lib/network/
 
-# script revision: $Revision$
-
 #######
 # do not alter variables from here on unless you know what you are doing
 UPLOAD_SUCCESSFUL=1
@@ -173,11 +171,12 @@ rp_links(){
 }
 
 prepare_node_update(){
-	UPLOADPREFIX="?do=update&node="
+	UPLOADPREFIX="?do=update&release=$agentRelease&version=$agentVersion&tree=$upgradetree&node="
 	UPLOADSUFFIX=""
 	obj -v UPLOADPREFIX
 		attr -v UPLOADPREFIX id $id
-		endobj -v UPLOADSUFFIX
+
+	endobj -v UPLOADSUFFIX
 	rem_trailing_comma -v UPLOADSUFFIX
 }
 
