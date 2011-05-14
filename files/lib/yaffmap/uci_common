@@ -147,6 +147,8 @@ saveid(){
 }
 
 load_node_data(){
+	local found_working_url
+	
 	config_load freifunk_map
 	config_get_batch ffmap nodeinterval linksinterval timeout id upgradetree
 	

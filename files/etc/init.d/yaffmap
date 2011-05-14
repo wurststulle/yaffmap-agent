@@ -76,12 +76,12 @@ upload(){
 		if [ "$errorcode" = "2" ]
 		then
 			echo "Node ID has not been valid. Server sent a new/correct one."
-			getid
 			NODEIDINVALID=1
+			getid
 		fi
 	fi
 
-	TXDATA=""
+	[ "$NODEIDINVALID" = "1" ] || TXDATA=""
 	[ "$DEBUG" = "1" ] && echo "exiting upload() $error"
 	return $error
 }
@@ -172,9 +172,18 @@ rp_links(){
 	return $error
 }
 
+prepare_node_update(){
+	UPLOADPREFIX="?do=update&node="
+	UPLOADSUFFIX=""
+	obj -v UPLOADPREFIX
+		attr -v UPLOADPREFIX id $id
+		endobj -v UPLOADSUFFIX
+	rem_trailing_comma -v UPLOADSUFFIX
+}
 
 getid(){
 	local error=0
+
 	eval $( 
 	ifconfig | awk '{
 		if ($0~/HWaddr/) {
@@ -198,6 +207,13 @@ getid(){
 		error=1
 	fi
 	
+	if [ "$NODEIDINVALID" = "1" ]
+	then
+		load_node_data
+		prepare_node_update
+		upload
+	fi
+	
 	[ "$DEBUG" = "1" ] && echo "exiting getid() $error"
 	[ "$error" = "1" ] && ERROR_REASON=" getid "
 	return $error
@@ -206,16 +222,6 @@ getid(){
 
 update(){
 	[ "$DEBUG" = "1" ] &&	echo "entered update() $1"
-	
-	prepare_node_update(){
-		UPLOADPREFIX="?do=update&node="
-		UPLOADSUFFIX=""
-		obj -v UPLOADPREFIX
-			attr -v UPLOADPREFIX id $id
-
-		endobj -v UPLOADSUFFIX
-		rem_trailing_comma -v UPLOADSUFFIX
-	}
 	
 	local update_mode="$1" error=0
 
@@ -270,11 +276,6 @@ update(){
 			
 			if ! upload_split_check -p; then error=1; ERROR_REASON="$ERROR_REASON node_update"; fi
 			
-			if [ "$NODEIDINVALID" = "1" ]
-			then 
-				NODEIDINVALID=0
-				update node
-			fi
 			;;
 	esac
 
