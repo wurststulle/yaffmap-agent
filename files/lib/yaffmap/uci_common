@@ -39,6 +39,7 @@ migrate_from_old(){
 
 	if [ -z "$server" ]
 	then
+		uci add_list freifunk_map.ffmap.server=http://yaffmap.gross-holger.de/index.php
 		uci add_list freifunk_map.ffmap.server=http://wurststulle.dyndns.org/yaffmap/index.php
 		uci add_list freifunk_map.ffmap.server=http://yaffmap.basicinside.de/index.php
 	fi
