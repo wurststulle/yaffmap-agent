@@ -34,6 +34,7 @@ define Package/yaffmap_uci/install
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/files/etc/init.d/yaffmap $(1)/etc/init.d
 	$(INSTALL_DIR) $(1)/lib/yaffmap
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/files/lib/yaffmap/release.txt $(1)/lib/yaffmap/release.txt
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/files/lib/yaffmap/common_json_helper $(1)/lib/yaffmap
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/files/lib/yaffmap/common_rp_olsr $(1)/lib/yaffmap
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/files/lib/yaffmap/fff_common $(1)/lib/yaffmap
