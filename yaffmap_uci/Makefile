@@ -37,10 +37,6 @@ define Package/yaffmap_uci/install
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/files/lib/yaffmap/release.txt $(1)/lib/yaffmap/release.txt
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/files/lib/yaffmap/common_json_helper $(1)/lib/yaffmap
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/files/lib/yaffmap/common_rp_olsr $(1)/lib/yaffmap
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/files/lib/yaffmap/fff_common $(1)/lib/yaffmap
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/files/lib/yaffmap/fff_rp_olsr $(1)/lib/yaffmap
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/files/lib/yaffmap/platform_common $(1)/lib/yaffmap
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/files/lib/yaffmap/platform_rp_olsr $(1)/lib/yaffmap
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/files/lib/yaffmap/uci_common $(1)/lib/yaffmap
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/files/lib/yaffmap/uci_rp_olsr $(1)/lib/yaffmap
 endef
