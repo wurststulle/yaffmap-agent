@@ -198,7 +198,7 @@ getid(){
 		}'
 	)
 
-	if upload "$URL?do=getID&addressSet=[{\"macAddr\":\"$macaddr\",\"ipv4Addr\":\"$ip\"}]"
+	if upload "$URL?do=getID&release=$agentRelease&version=$agentVersion&tree=$upgradetree&addressSet=[{\"macAddr\":\"$macaddr\",\"ipv4Addr\":\"$ip\"}]"
 	then
 		eval "$SERVER_RESPONSE"
 		saveid "$id"
