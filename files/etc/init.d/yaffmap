@@ -54,7 +54,7 @@ upload(){
 			length=${#txurl}
 			echo "\$TXURL is $length long"
 			echo "upload-string: $txurl"
-			echo "error text: $errormessage"
+			echo "server response message: $errormessage"
 			echo "update returnstring: $SERVER_RESPONSE"
 		fi
 
