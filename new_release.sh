@@ -73,7 +73,7 @@ done
 #packaging
 echo "Creating tarball."
 cd files
-echo "$RELEASE" > lib/yaffmap/release.txt
+echo "$TREE:$RELEASE" > lib/yaffmap/release.txt
 tar --exclude=".svn" --exclude="*~"  -czf ../yaffmap_${RELEASE}_${VERSION}_${TREE}.tar.gz etc/init.d/yaffmap lib/yaffmap/common* lib/yaffmap/$VERSION* lib/yaffmap/release.txt
 check_error $? "tarball creation"
 
