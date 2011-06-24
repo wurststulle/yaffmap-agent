@@ -291,7 +291,7 @@ check_new_release(){
 		rel="&rel=$(cat /lib/yaffmap/release.txt)"
 	fi
 	
-	txurl="${URL}?do=getUpgrade${rel}&tree=devel&version=uci"
+	txurl="${URL}?do=getUpgrade&release=$agentRelease&version=$agentVersion&tree=$upgradetree"
 	upload $txurl
 	
 	if [ -n "$SERVER_RESPONSE" -o "$FORCE" = "1" ]
