@@ -3,7 +3,7 @@
 ANNOUNCE_URL="http://wurststulle.dyndns.org/yaffmap/index.php"
 
 usage(){
-	echo "usage: $0 -t tree -v version -r release [-h]"
+	echo "usage: $0 -t tree -v version -r release"
 	echo "       tree      stable|devel"
 	echo "       version   e.g. uci or fff"
 	echo "       release   e.g. 0.1-1"
@@ -20,8 +20,7 @@ check_error(){
 }
 
 announce(){
-	[ "$HEAD" = "1" ] && ishead="&isHead=true"
-	returnstring=$( curl --upload-file ../yaffmap_${RELEASE}_${VERSION}_${TREE}.tar.gz  "$ANNOUNCE_URL?do=newAgentReleaseWithFile&tree=$TREE&version=$VERSION&release=$RELEASE$ishead" )
+	returnstring=$( curl --upload-file ../yaffmap_${RELEASE}_${VERSION}_${TREE}.tar.gz  "$ANNOUNCE_URL?do=newAgentReleaseWithFile&tree=$TREE&version=$VERSION&release=$RELEASE" )
 	check_error $? "upload and accouncement to webserver"
 
 	errorcode=$( echo $returnstring | cut -d"|" -f1 )
@@ -36,7 +35,7 @@ announce(){
 		echo 
 		echo "Error Text: $errormessage"
 		echo 
-		echo "Transmit String: $ANNOUNCE_URL?do=newAgentReleaseWithFile&tree=$TREE&version=$VERSION&release=$RELEASE$ishead"
+		echo "Transmit String: $ANNOUNCE_URL?do=newAgentReleaseWithFile&tree=$TREE&version=$VERSION&release=$RELEASE"
 		echo
 		check_error 1 "upload to webserver"
 	fi
@@ -48,13 +47,12 @@ announce(){
 while [ -n "$1" ]
 do
 	case $1 in
-		"-r"	) RELEASE=$2 
+		"-r"	)	RELEASE=$2 
 						shift ;;
 		"-v"	)	VERSION=$2 
 						shift ;;
 		"-t"	)	TREE=$2 
 						shift ;;
-		"-h"	) HEAD=1 ;;
 	esac
 	shift
 done	
