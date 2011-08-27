@@ -1,12 +1,12 @@
 #!/bin/sh
 
-
+SOURCE_PATH="./"
 IPS="192.168.0.252"
 #IPS="104.0.200.42"
 #IPS="$IPS 104.0.200.65 104.0.200.66 104.0.200.67 104.0.200.42 104.0.200.2 104.0.200.6 104.0.200.49"
 #IPS="$IPS 104.0.200.255"
 
-cd ~/yaffmap-agent/files
+cd $SOURCE_PATH/files
 tar --exclude=".svn" --exclude="*~"  -czf ../uci_redist.tar.gz etc/init.d/yaffmap lib/yaffmap/common* lib/yaffmap/uci* lib/yaffmap/release.txt
 
 for ip in  $IPS
