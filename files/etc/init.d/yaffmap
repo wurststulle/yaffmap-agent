@@ -10,6 +10,7 @@ DEBUG=0
 QUIET=0
 TEMP_DIR=/tmp
 URL=""
+DEFAULT_SERVERS="http://wurststulle.dyndns.org/yaffmap/index.php http://yaffmap.gross-holger.de/index.php http://yaffmap.basicinside.de/index.php"
 
 for file in $( find /lib/yaffmap/* ! -name "*.txt" | grep -v \~ )
 do

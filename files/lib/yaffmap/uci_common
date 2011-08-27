@@ -13,6 +13,13 @@ make_dev_list(){
 	DEVICES="$DEVICES $1"
 }
 
+add_servers_to_config(){
+	for server in $DEFAULT_SERVERS
+	do
+		uci add_list freifunk_map.ffmap.server=$server
+	done
+}
+
 migrate_from_old(){
 	local linkinterval upgradeinterval server
 
@@ -39,9 +46,7 @@ migrate_from_old(){
 
 	if [ -z "$server" ]
 	then
-		uci add_list freifunk_map.ffmap.server=http://yaffmap.gross-holger.de/index.php
-		uci add_list freifunk_map.ffmap.server=http://wurststulle.dyndns.org/yaffmap/index.php
-		uci add_list freifunk_map.ffmap.server=http://yaffmap.basicinside.de/index.php
+		add_servers_to_config
 	fi
 	
 	# add parameter -q to crontab entries
@@ -95,10 +100,9 @@ config 'node' 'ffmap'
 	option	'linksinterval' '0.1'
 	option	'upgradeinterval' '12'
 	option	'timeout' '5'
-	list	'server' 'http://wurststulle.dyndns.org/ffmap/build/index.php'
-	list  'server' 'http://yaffmap.basicinside.de/index.php'
 
 EOF
+		add_servers_to_config
 	fi
 }
 
