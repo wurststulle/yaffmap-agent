@@ -178,8 +178,8 @@ load_node_data(){
 		if [ "$found_working_url" != "1" ]
 		then
 			local l_url="$1"
-			wget -T 30 -q -O/dev/null "$l_url"
-			if [ $? -eq 0  ] 
+			returnstring=$(wget -T 30 -q -O- "$l_url?do=ping")
+			if [ $? -eq 0 -a -n "$(echo $returnstring | grep 'Yaffmap backend')" ] 
 			then
 				URL="$l_url"
 				found_working_url="1"
