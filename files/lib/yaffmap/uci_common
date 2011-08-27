@@ -14,7 +14,9 @@ make_dev_list(){
 }
 
 add_servers_to_config(){
-	for server in $DEFAULT_SERVERS
+	local servers=$1
+	
+	for server in $servers
 	do
 		uci add_list freifunk_map.ffmap.server=$server
 	done
@@ -46,7 +48,20 @@ migrate_from_old(){
 
 	if [ -z "$server" ]
 	then
-		add_servers_to_config
+		add_servers_to_config $DEFAULT_SERVERS
+	else
+		uci del freifunk_map.ffmap.server
+		for s in $server
+		do
+			case $s in
+				http://wurststulle.dyndns.org/ffmap/build/index.php ) 
+					add_servers_to_config "http://wurststulle.dyndns.org/yaffmap/index.php"
+					;;
+				* )	
+					add_servers_to_config $s
+					;;
+			esac
+		done
 	fi
 	
 	# add parameter -q to crontab entries
@@ -102,7 +117,7 @@ config 'node' 'ffmap'
 	option	'timeout' '5'
 
 EOF
-		add_servers_to_config
+		add_servers_to_config $DEFAULT_SERVERS
 	fi
 }
 
