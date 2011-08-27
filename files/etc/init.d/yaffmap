@@ -297,7 +297,7 @@ check_new_release(){
 	
 	if [ -n "$SERVER_RESPONSE" -o "$FORCE" = "1" ]
 	then
-		eval $SERVER_RESPONSE #this creates the variable "url"
+		url=$SERVER_RESPONSE
 		echo "New Map Agent release found, attempting to upgrade!"
 		upgrade $url	
 	fi
