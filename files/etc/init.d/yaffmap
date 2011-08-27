@@ -83,7 +83,7 @@ upload_post(){
 	local returnstring postdata host
 	
 	rem_trailing_comma -v TXDATA
-	postdata="$UPLOADPREFIX$TXDATA}"
+	postdata="$UPLOADPREFIX$TXDATA$UPLOADSUFFIX"
 	
 	host=$(echo $URL|cut -d"/" -f3)
 	path="/"$(echo $URL|cut -d"/" -f4-)

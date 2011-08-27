@@ -243,8 +243,8 @@ interface_addresses(){
 	ip_params(){		
 		local config=$1
 		config_get_batch "$config" ipaddr ip6addr
-		[ -n "$ipaddr" ] && attr ipv4Addr $ipaddr
-		[ -n "$ip6addr" ] && attr ipv6Addr $ip6Addr
+		[ -n "$ipaddr" ] && attr ipv4Addr "$ipaddr"
+		[ -n "$ip6addr" ] && attr ipv6Addr "$ip6addr"
 	}
 
 	local config=$1
