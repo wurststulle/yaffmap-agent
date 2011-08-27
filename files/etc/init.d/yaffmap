@@ -6,6 +6,8 @@ include /lib/network/
 # do not alter variables from here on unless you know what you are doing
 UPLOAD_SUCCESSFUL=1
 PRETEND_UPLOAD=0
+#UPLOAD_METHOD=GET
+UPLOAD_METHOD=POST
 DEBUG=0
 QUIET=0
 TEMP_DIR=/tmp
@@ -17,10 +19,106 @@ do
 	. $file
 done
 
-
 upload(){
-	[ "$DEBUG" = "1" ] &&	echo "entered upload()"
+	local txurl="$1"
 	
+	if [ -z "$txurl" ]
+	then
+		case $UPLOAD_METHOD in
+			GET|get ) upload_get
+			;;
+			POST|post ) upload_post
+			;;
+		esac
+	else
+		upload_get $txurl
+	fi
+}
+
+upload_error(){
+	local returnstring="$1" txurl="$2"
+
+	errorcode=$( echo $returnstring | cut -d"|" -f1 )
+	errormessage=$( echo $returnstring | cut -d"|" -f2 )
+	SERVER_RESPONSE=$( echo $returnstring | cut -d"|" -f3 )
+
+	if [ "$DEBUG" = "1" ]
+	then
+		length=${#txurl}
+		echo "\$TXURL is $length long"
+		echo "upload-string: $txurl"
+		echo "server response message: $errormessage"
+		echo "update returnstring: $SERVER_RESPONSE"
+	fi
+
+	if [ "$errorcode" = "1" ] 
+	then
+		echo "Map Server returned error"
+		echo 
+		echo "Error Code: $errorcode"
+		echo 
+		echo "Error Text: $errormessage"
+		echo 
+		echo "Transmit String: $txurl"
+		echo
+		echo "Transmit POST Data: $TXDATA"
+		echo
+		error=1
+	fi
+		
+	if [ "$errorcode" = "2" ]
+	then
+		echo "Node ID has not been valid. Server sent a new/correct one."
+		NODEIDINVALID=1
+		getid
+	fi
+	
+	[ "$NODEIDINVALID" = "1" ] || TXDATA=""
+	return=$error
+}
+
+upload_post(){
+	[ "$DEBUG" = "1" ] && echo "entering upload_post()"
+
+	local returnstring postdata host
+	
+	rem_trailing_comma -v TXDATA
+	postdata="$UPLOADPREFIX$TXDATA}"
+	
+	host=$(echo $URL|cut -d"/" -f3)
+	path="/"$(echo $URL|cut -d"/" -f4-)
+	cat > /tmp/yaffmap_post_upload.tmp << EOF
+POST $path HTTP/1.1
+Host: $host
+Content-Type: application/x-www-form-urlencoded
+Content-Length: ${#postdata}
+
+$postdata
+EOF
+
+	if [ "$PRETEND_UPLOAD" = "1" ]
+	then
+		if [ "$QUIET" != "1" ]
+		then
+			length=${#postdata}
+			echo "\$postdata is $length long"
+			echo "This would have been transmitted without '-p':"
+			echo "\$postdata=$postdata"
+		fi
+	else
+		returnstring=$(nc $host 80 < /tmp/yaffmap_post_upload.tmp|grep "|")
+		error=$?
+#		rm /tmp/yaffmap_post_upload.tmp
+		upload_error "$returnstring" "$postdata"
+	fi
+
+	[ "$DEBUG" = "1" ] && echo "exiting upload_post() $error"
+	return $error
+}
+
+upload_get(){
+	[ "$DEBUG" = "1" ] &&	echo "entered upload_get()"
+
 	local error=0 returnstring errorcode errormessage error=0 txurl
   
 	rem_trailing_comma -v TXDATA
@@ -28,10 +126,10 @@ upload(){
 	then
 		txurl="$1"
 	else
-		txurl="$URL$UPLOADPREFIX$TXDATA$UPLOADSUFFIX"
+		txurl="$URL?$UPLOADPREFIX$TXDATA$UPLOADSUFFIX"
 	fi
 
-	txurl="$(echo $txurl|sed 's/ /%20/g' )"
+	txurl="$(echo $txurl|sed 's/ /%20/g' )" #TODO: serialize
 
 	if [ "$PRETEND_UPLOAD" = "1" ]
 	then
@@ -40,48 +138,17 @@ upload(){
 			length=${#txurl}
 			echo "\$TXURL is $length long"
 			echo "This would have been transmitted without '-p':"
-			echo "$txurl"
+			echo "\$txurl=$txurl"
+			echo "\$TXDATA=$TXDATA"
 		fi
 	else
 		returnstring="$( wget -T30 -q -O- $txurl )"
 		error=$?
 
-		errorcode=$( echo $returnstring | cut -d"|" -f1 )
-		errormessage=$( echo $returnstring | cut -d"|" -f2 )
-		SERVER_RESPONSE=$( echo $returnstring | cut -d"|" -f3 )
-
-		if [ "$DEBUG" = "1" ]
-		then
-			length=${#txurl}
-			echo "\$TXURL is $length long"
-			echo "upload-string: $txurl"
-			echo "server response message: $errormessage"
-			echo "update returnstring: $SERVER_RESPONSE"
-		fi
-
-		if [ "$errorcode" = "1" ] 
-		then
-			echo "Map Server returned error"
-			echo 
-			echo "Error Code: $errorcode"
-			echo 
-			echo "Error Text: $errormessage"
-			echo 
-			echo "Transmit String: $txurl"
-			echo
-			error=1
-		fi
-		
-		if [ "$errorcode" = "2" ]
-		then
-			echo "Node ID has not been valid. Server sent a new/correct one."
-			NODEIDINVALID=1
-			getid
-		fi
+		upload_error "$returnstring" "$txurl"
 	fi
 
-	[ "$NODEIDINVALID" = "1" ] || TXDATA=""
-	[ "$DEBUG" = "1" ] && echo "exiting upload() $error"
+	[ "$DEBUG" = "1" ] && echo "exiting upload_get() $error"
 	return $error
 }
 
@@ -172,7 +239,7 @@ rp_links(){
 }
 
 prepare_node_update(){
-	UPLOADPREFIX="?do=update&release=$agentRelease&version=$agentVersion&tree=$upgradetree&node="
+	UPLOADPREFIX="do=update&release=$agentRelease&version=$agentVersion&tree=$upgradetree&node="
 	UPLOADSUFFIX=""
 	obj -v UPLOADPREFIX
 		attr -v UPLOADPREFIX id $id
