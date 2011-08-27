@@ -41,19 +41,18 @@ olsr_global_update(){
 		echo "No olsr global update without globalinterval"
 		error=1
 	else
-		for olsr_config in /var/etc/olsrd.conf /var/etc/olsrd-ipv6.conf
+		for ipversion in 6 4
 		do
-			if [ -e $olsr_config ]
-			then
-				metrictype=$( grep LinkQualityAlgorithm $olsr_config | cut -d" " -f2 | sed 's/"//g' )
-				ipversion=$( grep IpVersion $olsr_config | cut -d" " -f2 | sed 's/"//g' )
-				latlonfile=$( grep latlon-file $olsr_config | cut -d" " -f3 | sed 's/"//g' )
-				hostsfile=$( grep hosts-file $olsr_config | cut -d" " -f3 | sed 's/"//g' )
-				if ! olsr_global_update_common "$updateintervalglobal" "$suffix" "$metrictype" "$ipversion" "$latlonfile" "$hostsfile" "$tree" "$release" "$version"
-				then 
-					error=1
-					ERROR_REASON="$ERROR_REASON olsr_global_update_common"
-				fi
+			[ "$ipversion" = "6" ] && ip="[::1]" || ip="127.0.0.1"
+			eval $( wget -q -O- http://$ip:2006/config | awk '{
+					if ($0 ~ "LinkQualityAlgorithm"){print "metrictype="$2}
+					if ($0 ~ "latlon-file"){print "latlonfile="$3}
+					if ($0 ~ "hosts-file"){print "hostsfile="$3}
+				}' )
+			if ! olsr_global_update_common "$updateintervalglobal" "$suffix" "$metrictype" "$ipversion" "$latlonfile" "$hostsfile" "$tree" "$release" "$version"
+			then 
+				error=1
+				ERROR_REASON="$ERROR_REASON olsr_global_update_common"
 			fi
 		done
 	fi
