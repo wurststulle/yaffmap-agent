@@ -1,6 +1,6 @@
 #!/bin/sh
 
-SOURCE_PATH="./"
+SOURCE_PATH="$HOME/yaffmap-agent"
 IPS="192.168.0.252"
 #IPS="104.0.200.42"
 #IPS="104.13.3.33"
@@ -21,7 +21,7 @@ do
 		echo -n " [SCP]"
 		scp -q ../uci_redist.tar.gz root@$ip:/tmp/ 
 		echo " [unpacking]"
-		ssh root@$ip "export PATH=/bin:/sbin:/usr/bin:/usr/sbin; /etc/init.d/yaffmap stop; rm -rf /lib/yaffmap /etc/init.d/yaffmap;cd /; tar xzf /tmp/uci_redist.tar.gz; rm /tmp/uci_redist.tar.gz; /etc/init.d/yaffmap start -du -v"
+		ssh root@$ip "export PATH=/bin:/sbin:/usr/bin:/usr/sbin; /etc/init.d/yaffmap stop; rm -rf /lib/yaffmap /etc/init.d/yaffmap;cd /; tar xzf /tmp/uci_redist.tar.gz; rm /tmp/uci_redist.tar.gz" #; /etc/init.d/yaffmap start -du -v"
 	fi
 done
 
