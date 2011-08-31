@@ -252,7 +252,7 @@ interface_addresses(){
 	
 	if [ -n "$ifname" ]
 	then
-		macaddr=$( ifconfig $ifname | grep HWaddr | cut -d" " -f11 )
+		macaddr=$( cat /sys/class/net/$ifname/address )
 		attr macAddr $macaddr
 		ip_params $config
 		[ "$type" = "bridge" ] && attr bridgeName "$ifname"
@@ -293,7 +293,7 @@ wifi_device_attributes(){
 				[ -n "$bssid" ] && attr bssid $bssid
 				[ -n "$mode" ] && attr wlMode $mode
 				attr name $ifname
-				wlmac=$( ifconfig $ifname | grep HWaddr | cut -d" " -f11 )
+				wlmac=$( cat /sys/class/net/$ifname/address )
 				attr wlMacAddr $wlmac
 				interface_addresses $network
 				config_get type "$network" type
@@ -426,7 +426,7 @@ rf_links(){
 			config_get ifname $config ifname
 			if [ -n "$ifname" ]
 			then
-				macaddr=$( ifconfig $ifname | grep HWaddr | cut -d" " -f11 )
+				macaddr=$( cat /sys/class/net/$ifname/address )
 				case $3 in
 					atheros)	
 						temp=$( wlanconfig $ifname list sta | grep -v ADDR | grep -i -v $macaddr | awk -v source=$macaddr '{print "obj; attr sMac "source"; attr dMac "$1"; attr rssi "$6"; endobj;upload_split_check"}' ) 
