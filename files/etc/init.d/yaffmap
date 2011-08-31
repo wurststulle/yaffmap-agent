@@ -59,7 +59,7 @@ upload_error(){
 		echo 
 		echo "Error Text: $errormessage"
 		echo 
-		[ "$UPLOAD_METHOD" = "GET" ] && echo "Transmit String: $txurl" || { echo -n "Transmit POST data: ";cat /tmp/yaffmap_post_upload.tmp }
+		[ "$UPLOAD_METHOD" = "GET" ] && echo "Transmit String: $txurl" || ( echo -n "Transmit POST data: ";cat /tmp/yaffmap_post_upload.tmp )
 		echo
 		error=1
 	fi
