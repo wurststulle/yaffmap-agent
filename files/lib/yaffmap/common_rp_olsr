@@ -28,7 +28,6 @@ EOM
 			array -v SECTIONPREFIX link
 			endarr -v SECTIONSUFFIX
 			endobj -v SECTIONSUFFIX
-			endobj -v SECTIONSUFFIX
 			while read my_ip n_ip lq nlq etx 
 			do
 				if [ -n "$n_ip" -a "$etx" != "INFINITE" ]; then
@@ -48,7 +47,7 @@ EOM
 
 	SECTIONPREFIX=""
 	SECTIONSUFFIX=""
-		
+	
 	[ "$DEBUG" = "1" ] && echo "exiting olsr_links_common() $error"
 	return $error
 }

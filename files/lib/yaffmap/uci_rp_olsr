@@ -4,7 +4,7 @@ olsr_links(){
 	[ "$DEBUG" = "1" ] && echo "entering olsr_links()"
 	local config error=0
 
-	for config in /var/etc/olsrd.conf /var/etc/olsrd-ipv6.conf
+	for config in /var/etc/olsrd.conf.ipv4 /var/etc/olsrd.conf.ipv6
 	do
 		if [ -e $config ]
 		then
