@@ -6,13 +6,13 @@ include /lib/network/
 # do not alter variables from here on unless you know what you are doing
 UPLOAD_SUCCESSFUL=1
 PRETEND_UPLOAD=0
-#UPLOAD_METHOD=GET
-UPLOAD_METHOD=POST
 DEBUG=0
 QUIET=0
 TEMP_DIR=/tmp
 URL=""
 DEFAULT_SERVERS="http://wurststulle.dyndns.org/yaffmap/index.php http://yaffmap.gross-holger.de/index.php http://yaffmap.basicinside.de/index.php"
+NC=$( which nc )
+[ -n "$NC" ] && UPLOAD_METHOD=POST || UPLOAD_METHOD=GET
 
 for file in $( find /lib/yaffmap/* ! -name "*.txt" | grep -v \~ )
 do
@@ -59,9 +59,7 @@ upload_error(){
 		echo 
 		echo "Error Text: $errormessage"
 		echo 
-		echo "Transmit String: $txurl"
-		echo
-		echo "Transmit POST Data: $TXDATA"
+		[ "$UPLOAD_METHOD" = "GET" ] && echo "Transmit String: $txurl" || { echo -n "Transmit POST data: ";cat /tmp/yaffmap_post_upload.tmp }
 		echo
 		error=1
 	fi
@@ -80,10 +78,17 @@ upload_error(){
 upload_post(){
 	[ "$DEBUG" = "1" ] && echo "entering upload_post()"
 
-	local returnstring postdata host
+	local returnstring postdata host tmpfilename
 	
-	rem_trailing_comma -v TXDATA
-	postdata="$UPLOADPREFIX$TXDATA$UPLOADSUFFIX"
+	if [ -e /tmp/yaffmap_post_txbuffer.tmp ]
+	then
+		tr -d '\n' <  /tmp/yaffmap_post_txbuffer.tmp > /tmp/yaffmap_post_txbuffer
+		datasize="$(( ${#UPLOADPREFIX} + ${#UPLOADSUFFIX} + $(wc -c /tmp/yaffmap_post_txbuffer | sed -e 's/^[ \t]*//' | cut -d" " -f1 ) ))"
+	else
+		rem_trailing_comma
+		postdata="$UPLOADPREFIX$DATA$UPLOADSUFFIX"
+		datasize = ${#postdata}
+	fi
 	
 	host=$(echo $URL|cut -d"/" -f3)
 	path="/"$(echo $URL|cut -d"/" -f4-)
@@ -91,26 +96,39 @@ upload_post(){
 POST $path HTTP/1.1
 Host: $host
 Content-Type: application/x-www-form-urlencoded
-Content-Length: ${#postdata}
+Content-Length: $datasize
 
-$postdata
 EOF
+
+	if [ -e /tmp/yaffmap_post_txbuffer ] 
+	then 
+		sed -i s/\,\$// /tmp/yaffmap_post_txbuffer
+		( echo -n $UPLOADPREFIX; cat /tmp/yaffmap_post_txbuffer; echo -n $UPLOADSUFFIX ) >> /tmp/yaffmap_post_upload.tmp 
+	else
+		echo $postdata >> /tmp/yaffmap_post_upload.tmp
+	fi
 
 	if [ "$PRETEND_UPLOAD" = "1" ]
 	then
 		if [ "$QUIET" != "1" ]
 		then
-			length=${#postdata}
-			echo "\$postdata is $length long"
+			echo "postdata is $datasize bytes"
 			echo "This would have been transmitted without '-p':"
-			echo "\$postdata=$postdata"
+			echo "postdata=$( cat /tmp/yaffmap_post_upload.tmp ) "
 		fi
 	else
 		returnstring=$(nc $host 80 < /tmp/yaffmap_post_upload.tmp|grep "|")
 		error=$?
-#		rm /tmp/yaffmap_post_upload.tmp
+		if [ "$DEBUG" = "1" ]
+		then
+			[ -e /tmp/yaffmap_post_upload.tmp-$(date|cut -d" " -f4) ] && tmpfilename="/tmp/yaffmap_post_upload.tmp-$(date|cut -d" " -f4)_1" || tmpfilename=/tmp/yaffmap_post_upload.tmp-$(date|cut -d" " -f4)
+			cp /tmp/yaffmap_post_upload.tmp $tmpfilename
+		fi
 		upload_error "$returnstring" "$postdata"
+		rm /tmp/yaffmap_post_upload.tmp
 	fi
+	
+	rm /tmp/yaffmap_post_txbuffer.tmp #/tmp/yaffmap_post_txbuffer
 
 	[ "$DEBUG" = "1" ] && echo "exiting upload_post() $error"
 	return $error
@@ -154,55 +172,78 @@ upload_get(){
 
 upload_split_check(){
 #	[ "$DEBUG" = "1" ] && echo "entering upload_split_check()"
+	
 	local error=0 option="$1"
-
-	fill_txdata(){
-		TXDATA="$TXDATA$OLDSECTIONPREFIX$TXBUFFER"
-		rem_trailing_comma -v TXDATA
-		TXDATA="$TXDATA$OLDSECTIONSUFFIX"
-		[ -z "$OLDSECTIONSUFFIX" -a -n "$( echo $TXBUFFER | egrep -E '\,$')" ]  && TXDATA="$TXDATA,"
-		
-		if [ "$DEBUG" = "1" ]
-		then
-			echo "filled TXDATA"
-			echo "DATA=$DATA"
-			echo "TXBUFFER=$TXBUFFER"
-			echo "TXDATA=$TXDATA"
-		fi
-	}
-
-	if [ "$notfirstsection" -eq 1 ] && [ "$OLDSECTIONPREFIX" != "$SECTIONPREFIX" -o "\\$option" = "\\-p"  ]
-	then
-		[ "$DEBUG" = "1" ] && echo " OLDSECTIONPREFIX ($OLDSECTIONPREFIX) != SECTIONPREFIX ($SECTIONPREFIX) "
-		fill_txdata
-		TXBUFFER="$DATA"
-		[ "$TXDATA" = "$OLDSECTIONPREFIX$OLDSECTIONSUFFIX" ] && { 
-			TXDATA=""
-			DATA=""
-		}
-	else
-		[ -z "$notfirstsection" -a -z "$OLDSECTIONPREFIX" ] && notfirstsection=1
 	
-		[ "$DEBUG" = "1" ] && echo " adding DATA to TXBUFFER"
-		TXBUFFER="$TXBUFFER$DATA"
+	if [ "$UPLOAD_METHOD" = "POST" -o "$UPLOAD_METHOD" = "post" ]
+	then
+		if [ -n "$OLDSECTIONPREFIX" ]
+		then
+			if [ "$OLDSECTIONPREFIX" != "$SECTIONPREFIX" -o "\\$option" = "\\-p" -o "\\$option" = "\\-cs" ]
+			then 
+				[ "\\$option" = "\\-p" ] && SECTIONPREFIX=""
+				tr -d '\n' <  /tmp/yaffmap_post_txbuffer.tmp > /tmp/yaffmap_tmp
+				sed s/\,\$// /tmp/yaffmap_tmp > /tmp/yaffmap_post_txbuffer.tmp
+				echo "$OLDSECTIONSUFFIX$SECTIONPREFIX" >> /tmp/yaffmap_post_txbuffer.tmp
+			fi
+		else
+			echo "$SECTIONPREFIX" >> /tmp/yaffmap_post_txbuffer.tmp
+		fi
+		
+		echo "$DATA" >> /tmp/yaffmap_post_txbuffer.tmp
+		
 		DATA=""
-		
-		length=${#TXBUFFER}
-		if [ $length -gt 1500 ]
+		[ "\\$option" = "\\-p" ] && upload_post
+	else
+		fill_txdata(){
+			TXDATA="$TXDATA$OLDSECTIONPREFIX$TXBUFFER"
+			rem_trailing_comma -v TXDATA
+			TXDATA="$TXDATA$OLDSECTIONSUFFIX"
+			[ -z "$OLDSECTIONSUFFIX" ]  && TXDATA="$TXDATA,"
+			
+			if [ "$DEBUG" = "1" ]
+			then
+				echo "filled TXDATA"
+				echo "DATA=$DATA"
+				echo "TXBUFFER=$TXBUFFER"
+				echo "TXDATA=$TXDATA"
+			fi
+		}
+
+		if [ "$notfirstsection" -eq 1 ] && [ "$OLDSECTIONPREFIX" != "$SECTIONPREFIX" -o "\\$option" = "\\-p"  -o "\\$option" = "\\-cs" ]
 		then
+			[ "$DEBUG" = "1" ] && echo " OLDSECTIONPREFIX ($OLDSECTIONPREFIX) != SECTIONPREFIX ($SECTIONPREFIX) "
 			fill_txdata
+			TXBUFFER="$DATA"
+			[ "$TXDATA" = "$OLDSECTIONPREFIX$OLDSECTIONSUFFIX" ] && { 
+				TXDATA=""
+				DATA=""
+			}
+		else
+			[ -z "$notfirstsection" -a -z "$OLDSECTIONPREFIX" ] && notfirstsection=1
+		
+			[ "$DEBUG" = "1" ] && echo " adding DATA to TXBUFFER"
+			TXBUFFER="$TXBUFFER$DATA"
+			DATA=""
+			
+			length=${#TXBUFFER}
+			if [ $length -gt 1500 ]
+			then
+				fill_txdata
+			fi
+		fi
+
+
+		length=${#TXDATA}
+		if [ $length -gt 1500 -o "\\$option" = "\\-p" ]
+		then
+			upload_get
+			error=$?
+			TXBUFFER="$DATA"
+			TXDATA=""
 		fi
 	fi
-
-	length=${#TXDATA}
-	if [ $length -gt 1500 -o "\\$option" = "\\-p" ]
-	then
-		upload
-		error=$?
-		TXBUFFER="$DATA"
-		TXDATA=""
-	fi
-	
+			
 	OLDSECTIONPREFIX=$SECTIONPREFIX
 	OLDSECTIONSUFFIX=$SECTIONSUFFIX
 	
@@ -230,10 +271,13 @@ rp_links(){
 		done
 
 	[ $error -eq 0 ] && error=$?
-	
-	SECTIONSUFFIX=""
-	SECTIONPREFIX=""
 
+	SECTIONPREFIX=""
+	SECTIONSUFFIX=""
+
+	endobj -v OLDSECTIONSUFFIX
+	upload_split_check -cs
+	
 	[ "$DEBUG" = "1" ] && echo "exiting rp_links() $error"	
 	return $error
 }
@@ -317,6 +361,7 @@ update(){
 			;;
 		global)	
 			olsr_global_update || error=1
+			upload_split_check -p
 			;;
 		upgrade)
 			check_new_release
@@ -335,14 +380,15 @@ update(){
 			[ -n "$agentRelease" ] && attr agentRelease $agentRelease
 			[ -n "$agentVersion" ] && attr version $agentVersion
 			[ -n "$upgradetree" ] && attr upgradeTree $upgradetree
-			if ! upload_split_check; then error=1; ERROR_REASON="$ERROR_REASON node_update"; fi
+			upload_split_check || error=1
 
 			network_interfaces || error=1
 			rp_links || error=1
 			rf_links || error=1
 			
-			if ! upload_split_check -p; then error=1; ERROR_REASON="$ERROR_REASON node_update"; fi
+			upload_split_check -p || error=1
 			
+			[ "$error" = "1" ] && ERROR_REASON="$ERROR_REASON node_update"
 			;;
 	esac
 
