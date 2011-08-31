@@ -439,7 +439,7 @@ rf_links(){
 						do
 							temp=$( iw $if station dump | awk -v source=$macaddr '{
 								if($1~/Station/) print "obj;attr sMac "source";attr dMac "$2";";
-								if($1~/signal/) print "attr rssi "$2";";
+								if($0~/signal avg/) print "attr rssi "$3";";
 								if($0~/tx bitrate/) print "attr txRate "$3";endobj;upload_split_check;"}' )
 							eval "$temp"
 						done
