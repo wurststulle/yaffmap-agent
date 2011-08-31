@@ -418,7 +418,7 @@ rf_links(){
 	rflinks_wifi_iface(){
 		[ "$DEBUG" = "1" ] &&	echo "entered rflinks_wifi_iface() $1"
 
-		local config="$1" error=0 device ifname macaddr temp 
+		local config="$1" error=0 device ifname ifnames macaddr temp wds
 		config_get device "$config" device
 		
 		if [ "$device" = "$2" ]
@@ -432,12 +432,17 @@ rf_links(){
 						temp=$( wlanconfig $ifname list sta | grep -v ADDR | grep -i -v $macaddr | awk -v source=$macaddr '{print "obj; attr sMac "source"; attr dMac "$1"; attr rssi "$6"; endobj;upload_split_check"}' ) 
 						eval "$temp"
 						;;
-					mac80211)	
-						temp=$( iw $ifname station dump | awk -v source=$macaddr '{
-							if($1~/Station/) print "obj;attr sMac "source";attr dMac "$2";";
-							if($1~/signal/) print "attr rssi "$2";";
-							if($0~/tx bitrate/) print "attr txRate "$3";endobj;upload_split_check;"}' )
-						eval "$temp"
+					mac80211)
+						config_get_bool wds "$config" wds 0
+						[ "$wds" -gt 0 ] && ifnames="$( ls -1 /sys/class/net | grep ^$ifname )" || ifnames=$ifname
+						for if in $ifnames
+						do
+							temp=$( iw $if station dump | awk -v source=$macaddr '{
+								if($1~/Station/) print "obj;attr sMac "source";attr dMac "$2";";
+								if($1~/signal/) print "attr rssi "$2";";
+								if($0~/tx bitrate/) print "attr txRate "$3";endobj;upload_split_check;"}' )
+							eval "$temp"
+						done
 						;;
 				esac
 			fi
