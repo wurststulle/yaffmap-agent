@@ -244,7 +244,7 @@ interface_addresses(){
 		local config=$1
 		config_get_batch "$config" ipaddr ip6addr
 		[ -n "$ipaddr" ] && attr ipv4Addr "$ipaddr"
-		[ -n "$ip6addr" ] && attr ipv6Addr "$ip6addr"
+		[ -n "$ip6addr" ] && attr ipv6Addr $( echo $ip6addr | cut -d"/" -f1 )
 	}
 
 	local config=$1
