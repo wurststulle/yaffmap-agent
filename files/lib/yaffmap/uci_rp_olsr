@@ -27,7 +27,6 @@ olsr_update(){
 
 	if [ -n "$( olsrd -v 2>/dev/null | grep \*\*\* | grep 0\.5 )" ] 
 	then
-		echo "olsrd version <0.6"
 		configs="$( ps ax | grep olsrd | grep -v grep | awk '{for(i=1;i<NF;i++){if($i~/-f/){print $(i+1)}}}' )"
 		for config in $configs
 		do
