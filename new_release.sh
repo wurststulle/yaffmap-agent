@@ -1,12 +1,14 @@
 #!/bin/sh
 
 ANNOUNCE_URL="http://wurststulle.dyndns.org/yaffmap/index.php"
+VERSIONMAPPING=0
 
 usage(){
-	echo "usage: $0 -t tree -v version -r release"
+	echo "usage: $0 -t tree -v version -r release [-m]"
 	echo "       tree      stable|devel"
 	echo "       version   e.g. uci or fff"
 	echo "       release   e.g. 0.1-1"
+	echo "       -m		automatically create backend compatibility mapping on server"
 }
 
 check_error(){
@@ -20,7 +22,8 @@ check_error(){
 }
 
 announce(){
-	returnstring=$( curl --upload-file ../yaffmap_${RELEASE}_${VERSION}_${TREE}.tar.gz  "$ANNOUNCE_URL?do=newAgentReleaseWithFile&tree=$TREE&version=$VERSION&release=$RELEASE" )
+	[ "$VERSIONMAPPING" = "1" ] && vmappingstring="&mapping=1" || vmappingstring=""
+	returnstring=$( curl --upload-file ../yaffmap_${RELEASE}_${VERSION}_${TREE}.tar.gz  "$ANNOUNCE_URL?do=newAgentReleaseWithFile&tree=$TREE&version=$VERSION&release=$RELEASE$vmappingstring" )
 	check_error $? "upload and accouncement to webserver"
 
 	errorcode=$( echo $returnstring | cut -d"|" -f1 )
@@ -53,6 +56,8 @@ do
 						shift ;;
 		"-t"	)	TREE=$2 
 						shift ;;
+		"-m"	)	VERSIONMAPPING=1 
+						;;
 	esac
 	shift
 done	
