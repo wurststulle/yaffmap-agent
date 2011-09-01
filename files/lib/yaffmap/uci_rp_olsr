@@ -1,10 +1,87 @@
 #!/bin/sh
 
+olsr_update(){
+	local suffix error=0 do=$1
+	local ipversion metrictype ip
+
+	case $do in
+		global ) local latlonfile hostsfile updateintervalglobal version
+			updateintervalglobal=$( uci get freifunk_map.ffmap.globalinterval 2>/dev/null)
+			version="uci"
+			tree=$( cat /lib/yaffmap/release.txt | cut -d":" -f1 )
+			release=$( cat /lib/yaffmap/release.txt | cut -d":" -f2 )
+			[ "$FORCE" = "1" ] && [ -z "$updateintervalglobal" ] && updateintervalglobal=0
+
+			get_dnssuffix(){
+				[ -z "$suffix" ] && config_get suffix "$1" suffix
+			}
+			config_load olsrd
+			config_foreach get_dnssuffix LoadPlugin
+			if [ -z "$updateintervalglobal" ] 
+			then
+				echo "No olsr global update without globalinterval"
+				return 1
+			fi
+			;;
+	esac
+
+	if [ -n "$( olsrd -v 2>/dev/null | grep \*\*\* | grep 0\.5 )" ] 
+	then
+		echo "olsrd version <0.6"
+		configs="$( ps ax | grep olsrd | grep -v grep | awk '{for(i=1;i<NF;i++){if($i~/-f/){print $(i+1)}}}' )"
+		for config in $configs
+		do
+			metrictype=$( cat $config | grep LinkQualityAlgorithm | cut -d" " -f2 )
+			ipversion=$( cat $config | grep IpVersion | cut -d" " -f2 )
+			case $do in
+				links ) olsr_links_common $ipversion $metrictype
+					;;
+				global ) latlonfile=$( cat $config | grep latlon-file | cut -d" " -f3 | sed s/\"//g )
+					hostsfile=$( cat $config | grep hosts-file | cut -d" " -f3 | sed s/\"//g )
+					if [ -e $latlonfile -a -e $hostsfile ]
+					then
+						olsr_global_update_common "$updateintervalglobal" "$suffix" "$metrictype" "$ipversion" "$latlonfile" "$hostsfile" "$tree" "$release" "$version"
+					else
+						[ "$DEBUG" = "1" ] && echo "olsr_update: latlonfile and/or hostsfile not existing. aborting links update."
+					fi
+					;;
+			esac
+		done
+	else
+		for ipversion in $IPVERSIONS
+		do	
+			[ "$ipversion" = "6" ] && ip="[::1]" || ip="127.0.0.1"
+			eval $( wget -T30 -q -O- http://$ip:2006/config | awk '{
+				if ($0 ~ "LinkQualityAlgorithm"){print "metrictype="$2}
+				if ($0 ~ "latlon-file"){print "latlonfile="$3}
+				if ($0 ~ "latlon_file"){print "latlonfile="$3}
+				if ($0 ~ "hosts-file"){print "hostsfile="$3}
+				if ($0 ~ "hosts_file"){print "hostsfile="$3}
+			}' )
+			if [ $? ]
+			then
+				case $do in
+					links ) olsr_links_common $ipversion $metrictype
+						;;
+					global ) if [ -e $latlonfile -a -e $hostsfile ]
+						then
+							olsr_global_update_common "$updateintervalglobal" "$suffix" "$metrictype" "$ipversion" "$latlonfile" "$hostsfile" "$tree" "$release" "$version"
+						else
+							[ "$DEBUG" = "1" ] && echo "olsr_update: latlonfile and/or hostsfile not existing. aborting global update."
+						fi
+						;;
+				esac
+			fi
+		done
+	fi
+	error=$?
+}
+
 olsr_links(){
 	[ "$DEBUG" = "1" ] && echo "entering olsr_links()"
 	local config error=0
 
-	olsr_links_common || ( error=1; ERROR_REASON="$ERROR_REASON olsr_links_common" )
+	olsr_update links
 
 	[ "$DEBUG" = "1" ] && echo "exiting olsr_links() $error"
 	return $error
@@ -13,43 +90,8 @@ olsr_links(){
 olsr_global_update(){
 	[ "$DEBUG" = "1" ] && echo "entering olsr_global_update()"
 	local error=0
-	local suffix 
-	local updateintervalglobal ipversion metrictype
-	local latlonfile hostsfile
-
-	updateintervalglobal=$( uci get freifunk_map.ffmap.globalinterval 2>/dev/null)
-	version="uci"
-	tree=$( cat /lib/yaffmap/release.txt | cut -d":" -f1 )
-	release=$( cat /lib/yaffmap/release.txt | cut -d":" -f2 )
 	
-	[ "$FORCE" = "1" ] && [ -z "$updateintervalglobal" ] && updateintervalglobal=0
-
-	get_dnssuffix(){
-		[ -z "$suffix" ] && config_get suffix "$1" suffix
-	}
-	config_load olsrd
-	config_foreach get_dnssuffix LoadPlugin
-	
-	if [ -z "$updateintervalglobal" ]
-	then
-		echo "No olsr global update without globalinterval"
-		error=1
-	else
-		for ipversion in $IPVERSIONS
-		do
-			[ "$ipversion" = "6" ] && ip="[::1]" || ip="127.0.0.1"
-			eval $( wget -q -O- http://$ip:2006/config | awk '{
-					if ($0 ~ "LinkQualityAlgorithm"){print "metrictype="$2}
-					if ($0 ~ "latlon-file"){print "latlonfile="$3}
-					if ($0 ~ "hosts-file"){print "hostsfile="$3}
-				}' )
-			if ! olsr_global_update_common "$updateintervalglobal" "$suffix" "$metrictype" "$ipversion" "$latlonfile" "$hostsfile" "$tree" "$release" "$version"
-			then 
-				error=1
-				ERROR_REASON="$ERROR_REASON olsr_global_update_common"
-			fi
-		done
-	fi
+	olsr_update global	
 
 	[ "$DEBUG" = "1" ] && echo "exiting olsr_global_update() "$error
 	return $error
