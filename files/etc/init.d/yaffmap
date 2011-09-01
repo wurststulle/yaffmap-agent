@@ -125,10 +125,10 @@ EOF
 			cp /tmp/yaffmap_post_upload.tmp $tmpfilename
 		fi
 		upload_error "$returnstring" "$postdata"
-		rm /tmp/yaffmap_post_upload.tmp
+		rm /tmp/yaffmap_post_upload.tmp 2>/dev/null
 	fi
 	
-	rm /tmp/yaffmap_post_txbuffer.tmp #/tmp/yaffmap_post_txbuffer
+	rm /tmp/yaffmap_post_txbuffer.tmp 2>/dev/null #/tmp/yaffmap_post_txbuffer
 
 	[ "$DEBUG" = "1" ] && echo "exiting upload_post() $error"
 	return $error
@@ -351,6 +351,8 @@ update(){
 		getid
 		update_mode="node"
 	fi
+	
+	[ -e /sys/module/ipv6 ] && IPVERSIONS="4 6" || IPVERSIONS="4"
 
 	case $update_mode in
 		links)

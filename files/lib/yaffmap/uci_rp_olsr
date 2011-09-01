@@ -4,13 +4,7 @@ olsr_links(){
 	[ "$DEBUG" = "1" ] && echo "entering olsr_links()"
 	local config error=0
 
-	for config in /var/etc/olsrd.conf.ipv4 /var/etc/olsrd.conf.ipv6
-	do
-		if [ -e $config ]
-		then
-			if ! olsr_links_common $config ; then error=1; ERROR_REASON="$ERROR_REASON olsr_links_common"; fi
-		fi
-	done
+	olsr_links_common || ( error=1; ERROR_REASON="$ERROR_REASON olsr_links_common" )
 
 	[ "$DEBUG" = "1" ] && echo "exiting olsr_links() $error"
 	return $error
@@ -41,7 +35,7 @@ olsr_global_update(){
 		echo "No olsr global update without globalinterval"
 		error=1
 	else
-		for ipversion in 6 4
+		for ipversion in $IPVERSIONS
 		do
 			[ "$ipversion" = "6" ] && ip="[::1]" || ip="127.0.0.1"
 			eval $( wget -q -O- http://$ip:2006/config | awk '{

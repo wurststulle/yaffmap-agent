@@ -4,20 +4,21 @@ ROUTINGPROTOCOLS="$ROUTINGPROTOCOLS olsr"
 olsr_links_common(){
 	[ "$DEBUG" = "1" ] &&	echo "entered olsr_links_common()"
 
-	local olsr_config="$1" error=0
-	local metric ipversion my_ip n_ip lq nlq etx
+	local error=0
+	local metric metrictype ipversion my_ip n_ip lq nlq etx
 	
-	obj -v SECTIONPREFIX olsr
-		attr -v SECTIONPREFIX metric $( grep LinkQualityAlgorithm $olsr_config | cut -d" " -f2 | sed 's/"//g' ) 
-		ipversion=$( grep IpVersion $olsr_config | cut -d" " -f2 )
+	for ipversion in $IPVERSIONS
+	do	
+		[ "$ipversion" = "6" ] && ip="[::1]" || ip="127.0.0.1"
+		eval $( wget -T30 -q -O- http://$ip:2006/config | awk '{
+				if ($0 ~ "LinkQualityAlgorithm"){print "metrictype="$2}
+			}' )
+
+		obj -v SECTIONPREFIX olsr
+		attr -v SECTIONPREFIX metric $metrictype 
 		attr -v SECTIONPREFIX ipv $ipversion 
     
-		case "$ipversion" in
-			"4" ) wget -T30 -q -O- http://127.0.0.1:2006/links | grep -e ^[1-9] > /tmp/yaffmap_olsr_links
-					;;
-			"6" ) wget -T30 -q -O- http://[::1]:2006/links | grep -e ^[1-9] > /tmp/yaffmap_olsr_links
-					;;
-		esac
+		wget -T30 -q -O- http://$ip:2006/links | grep -e ^[1-9] > /tmp/yaffmap_olsr_links
 		
 		exec<<EOM
 		$( cat /tmp/yaffmap_olsr_links )
@@ -45,8 +46,9 @@ EOM
 			error=1
 		fi
 
-	SECTIONPREFIX=""
-	SECTIONSUFFIX=""
+		SECTIONPREFIX=""
+		SECTIONSUFFIX=""
+	done
 	
 	[ "$DEBUG" = "1" ] && echo "exiting olsr_links_common() $error"
 	return $error
