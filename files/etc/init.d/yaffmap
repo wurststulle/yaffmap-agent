@@ -336,6 +336,13 @@ update(){
 	
 	local update_mode="$1" error=0
 
+	[ "$UPLOAD_METHOD" = "POST" ] && {
+		for file in $TEMP_DIR/yaffmap_post_txbuffer $TEMP_DIR/yaffmap_tmp
+		do
+			[ -e $file ] && rm $file
+		done	
+	}
+
 	load_node_data
 	
 	if [ -z "$URL" ]
