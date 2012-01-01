@@ -1,8 +1,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=yaffmap_uci
-PKG_RELEASE:=$(shell LC_ALL=C git show --format=%ai --name-only --git-dir=$(CURDIR) \ 
-	$( git rev-parse HEAD ) | awk '$1~/^[0-9]/{gsub(":","-",$2);printf "%s_%s",$1,$2}' )
+PKG_RELEASE:=$(shell LC_ALL=C git show --format=%ai --name-only | LC_ALL=C git show --format=%ai --name-only \
+	| head -n1 | sed -e 's/-/_/g' -e 's/:/_/g' -e 's/ /_/g' -e 's/+//g')
 
 PKG_BUILD_DIR := $(BUILD_DIR)/$(PKG_NAME)
 
