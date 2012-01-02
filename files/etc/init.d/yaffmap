@@ -10,7 +10,7 @@ DEBUG=0
 QUIET=0
 TEMP_DIR=/tmp
 URL=""
-DEFAULT_SERVERS="http://wurststulle.dyndns.org/yaffmap/index.php http://yaffmap.gross-holger.de/index.php http://yaffmap.basicinside.de/index.php"
+DEFAULT_SERVERS="http://wurststulle.dyndns.org/yaffmap/index.php http://yaffmap.basicinside.de/index.php"
 NC=$( which nc )
 [ -n "$NC" ] && UPLOAD_METHOD=POST || UPLOAD_METHOD=GET
 
