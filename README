@@ -7,7 +7,7 @@ git clone git://github.com/wurststulle/yaffmap-agent.git
 svn co svn://svn.openwrt.org/openwrt/branches/backfire backfire
 
 cd backfire
-echo "src-link yaffmapagent ../yaffmap-agent" >> feeds.conf
+echo "src-link yaffmapagent ../../yaffmap-agent" >> feeds.conf
 scripts/feeds update
 scripts/feeds install -a
 make menuconfig
